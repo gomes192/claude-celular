@@ -65,6 +65,8 @@
     background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; }
   .item + .item { border-top:1px solid var(--brd); }
   .item.pend::before { content:""; flex:none; width:8px; height:8px; border-radius:50%; background:var(--acc); }
+  .item.novo::before { content:""; flex:none; width:8px; height:8px; border-radius:50%; background:var(--sub); opacity:.6; }
+  .q-text.longo { font-size:16px; font-weight:400; line-height:1.5; white-space:pre-wrap; }
   .item-txt { flex:1; min-width:0; }
   .item-tit { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-weight:500; }
   .item-txt .sub { display:block; margin-top:2px; }
@@ -501,9 +503,11 @@ async function telaInicio(primeiraVez) {
   const k = c.chaves(c.fromHex(cfg.mestra))
   const pendentesBox = el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…'))
   const respondidasBox = el('div', { class: 'lista' })
+  const atualizacoesSec = el('div', {})
   tela(
     el('p', {}, el('span', { class: 'chip' }, primeiraVez ? 'Pareado agora' : 'Celular pareado')),
     el('h2', {}, 'Esperando você'), pendentesBox,
+    atualizacoesSec,
     el('h2', {}, 'Respondidas'), respondidasBox,
     el('h2', {}, 'Configuração'),
     el('div', { class: 'card' }, blocoConfigurar(cfg, primeiraVez || lerHist().length === 0)),
@@ -512,9 +516,9 @@ async function telaInicio(primeiraVez) {
       localStorage.removeItem(LS); localStorage.removeItem(LS_HIST); await idb.limpar(); telaPareamento()
     } }, 'Desparear este celular'),
   )
-  const item = (h, pendente) => {
+  const item = (h, pendente, novo) => {
     const p0 = h.q?.perguntas?.[0]
-    return el('button', { class: pendente ? 'item pend' : 'item', onclick: () => { location.hash = `id=${h.id}` } },
+    return el('button', { class: pendente ? 'item pend' : novo ? 'item novo' : 'item', onclick: () => { location.hash = `id=${h.id}` } },
       el('span', { class: 'item-txt' },
         el('span', { class: 'item-tit' }, p0?.titulo || p0?.texto || 'Pergunta'),
         el('span', { class: 'sub' }, [h.q?.pc, h.q?.projeto, (h.q?.imagens || []).length ? `${h.q.imagens.length} imagem(ns)` : null, quando(h.em || h.vistaEm || Date.now())].filter(Boolean).join(' · '))),
@@ -530,6 +534,7 @@ async function telaInicio(primeiraVez) {
     if (minha !== vez) return
     const st = await statusTodos(cfg, k)
     let pend = []
+    let atuais = []
     try {
       for (const m of await mensagens(cfg, '-q')) {
         const id = m.title
@@ -544,6 +549,8 @@ async function telaInicio(primeiraVez) {
           registrar(id, { q, vistaEm: m.time * 1000 })
         }
         if (st.has(id)) continue // respondida no PC (ou por outro aparelho): vai para "Respondidas"
+        // Atualização de status: só para ler, não entra em "Esperando você".
+        if (q.origem === 'status') { atuais.push({ id, q, em: m.time * 1000, novo: !doHist(id)?.lidaEm }); continue }
         if (q.exp && Date.now() > q.exp) continue
         pend.push({ id, q, em: m.time * 1000 })
       }
@@ -556,6 +563,10 @@ async function telaInicio(primeiraVez) {
     }
     if (minha !== vez) return
     pend = pend.sort((a, b) => b.em - a.em)
+    atuais = atuais.sort((a, b) => b.em - a.em).slice(0, 15)
+    atualizacoesSec.replaceChildren(...(atuais.length
+      ? [el('h2', {}, 'Atualizações'), el('div', { class: 'lista' }, ...atuais.map(h => item(h, false, h.novo)))]
+      : []))
     pendentesBox.replaceChildren(...(pend.length ? pend.map(h => item(h, true)) : [el('p', { class: 'sub' }, 'Nenhuma pergunta esperando. 🎉')]))
     desenharRespondidas(st)
   }
@@ -586,6 +597,12 @@ async function telaPergunta(cfg, id, faixa) {
   const local = doHist(id)
   const s = st.get(id)
   if (local?.resposta || s?.estado) return telaRespondida(cfg, k, id, q, s, local, faixa)
+  if (q.origem === 'status') registrar(id, { lidaEm: Date.now() })
+  if (q.origem === 'status' && q.exp && Date.now() > q.exp) {
+    return tela(voltar(), el('p', { class: 'sub' }, 'Atualização do Claude'), deOnde(q), ...imagensDaPergunta(cfg, k, id, q),
+      ...q.perguntas.map(p => el('div', { class: 'card' }, el('div', { class: 'q-text longo' }, p.texto))),
+      el('p', { class: 'sub' }, 'Já não dá para responder por aqui (passou de 12 h).'))
+  }
   if (q.exp && Date.now() > q.exp) {
     return tela(voltar(), el('div', { class: 'faixa' }, 'Esta pergunta expirou sem resposta.'), ...imagensDaPergunta(cfg, k, id, q),
       ...q.perguntas.map(p => el('div', { class: 'card' }, p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null, el('div', { class: 'q-text' }, p.texto))))
@@ -594,7 +611,8 @@ async function telaPergunta(cfg, id, faixa) {
 }
 
 function telaFormulario(cfg, k, id, q) {
-  const soMensagem = q.origem === 'mensagem' && q.perguntas.every(p => !(p.opcoes || []).length)
+  const ehStatus = q.origem === 'status'
+  const soMensagem = ehStatus || (q.origem === 'mensagem' && q.perguntas.every(p => !(p.opcoes || []).length))
   const estado = q.perguntas.map(() => ({ escolhas: new Set(), texto: '' }))
   const cards = q.perguntas.map((p, i) => {
     const botoes = (p.opcoes || []).map(o => {
@@ -612,7 +630,7 @@ function telaFormulario(cfg, k, id, q) {
       : null
     return el('div', { class: 'card' },
       p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
-      el('div', { class: 'q-text' }, p.texto),
+      el('div', { class: ehStatus ? 'q-text longo' : 'q-text' }, p.texto),
       p.multipla ? el('p', { class: 'sub' }, 'Pode marcar mais de uma.') : null,
       botoes, txt)
   })
@@ -636,8 +654,8 @@ function telaFormulario(cfg, k, id, q) {
   })
   // escolher uma opção já libera a seta de enviar
   for (const card of cards) card.addEventListener('click', () => caixa.atualizar())
-  tela(voltar(), deOnde(q), ...imagensDaPergunta(cfg, k, id, q), ...cards,
-    soMensagem ? el('p', { class: 'sub' }, 'Não precisa responder.') : null, caixa.el)
+  tela(voltar(), ehStatus ? el('p', { class: 'sub' }, 'Atualização do Claude') : null, deOnde(q), ...imagensDaPergunta(cfg, k, id, q), ...cards,
+    soMensagem ? el('p', { class: 'sub' }, ehStatus ? 'Só para você saber: não precisa responder. Se quiser, escreva abaixo.' : 'Não precisa responder.') : null, caixa.el)
 }
 
 /** Já respondida: só leitura (pergunta, imagens, sua resposta, suas fotos) e um único complemento. */
@@ -651,7 +669,7 @@ function telaRespondida(cfg, k, id, q, s, local, faixa) {
     const escolhidas = new Set(r?.escolhas || [])
     return el('div', { class: 'card' },
       p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
-      el('div', { class: 'q-text' }, p.texto),
+      el('div', { class: q.origem === 'status' ? 'q-text longo' : 'q-text' }, p.texto),
       ...(p.opcoes || []).map(o => el('button', { class: p.multipla ? 'opt multi' : 'opt', disabled: true, 'aria-pressed': String(escolhidas.has(o.rotulo)) }, o.rotulo)),
       r?.texto ? el('p', { class: 'resp', style: 'margin-top:10px' }, `Você escreveu: ${r.texto}`) : null)
   })
