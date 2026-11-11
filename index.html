@@ -162,6 +162,12 @@ function salvarHist(h) {
   try { localStorage.setItem(LS_HIST, JSON.stringify(manter)) } catch { /* cheio: segue sem histórico */ }
 }
 const doHist = id => lerHist().find(x => x.id === id)
+// "PC: Notebook · Projeto: X" (o PC só aparece quando a pergunta veio de um mod que manda o nome)
+function deOnde(q) {
+  const partes = [q.pc ? `PC: ${q.pc}` : null, q.projeto ? `Projeto: ${q.projeto}` : null].filter(Boolean)
+  return partes.length ? el('p', { class: 'sub' }, partes.join(' · ')) : null
+}
+
 function registrar(id, dados) {
   const h = lerHist()
   const i = h.findIndex(x => x.id === id)
@@ -511,7 +517,7 @@ async function telaInicio(primeiraVez) {
     return el('button', { class: pendente ? 'item pend' : 'item', onclick: () => { location.hash = `id=${h.id}` } },
       el('span', { class: 'item-txt' },
         el('span', { class: 'item-tit' }, p0?.titulo || p0?.texto || 'Pergunta'),
-        el('span', { class: 'sub' }, [h.q?.projeto, (h.q?.imagens || []).length ? `${h.q.imagens.length} imagem(ns)` : null, quando(h.em || h.vistaEm || Date.now())].filter(Boolean).join(' · '))),
+        el('span', { class: 'sub' }, [h.q?.pc, h.q?.projeto, (h.q?.imagens || []).length ? `${h.q.imagens.length} imagem(ns)` : null, quando(h.em || h.vistaEm || Date.now())].filter(Boolean).join(' · '))),
       el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
   }
   const desenharRespondidas = st => {
@@ -630,7 +636,7 @@ function telaFormulario(cfg, k, id, q) {
   })
   // escolher uma opção já libera a seta de enviar
   for (const card of cards) card.addEventListener('click', () => caixa.atualizar())
-  tela(voltar(), q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null, ...imagensDaPergunta(cfg, k, id, q), ...cards,
+  tela(voltar(), deOnde(q), ...imagensDaPergunta(cfg, k, id, q), ...cards,
     soMensagem ? el('p', { class: 'sub' }, 'Não precisa responder.') : null, caixa.el)
 }
 
@@ -682,7 +688,7 @@ function telaRespondida(cfg, k, id, q, s, local, faixa) {
   tela(voltar(),
     faixa ? el('div', { class: 'faixa', role: 'status' }, faixa) : null,
     el('p', { class: cancelada ? 'sub' : 'ok' }, `${cancelada ? '' : '✓ '}${ondeResp}${quandoResp ? ` · ${quando(quandoResp)}` : ''}`),
-    q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null,
+    deOnde(q),
     ...imagensDaPergunta(cfg, k, id, q), ...cards, resumoPc, ...minhasFotos,
     ehCaixa ? null : el('h2', {}, 'Complemento'), blocoComp)
 }
