@@ -2,32 +2,111 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1f1e1d" media="(prefers-color-scheme: dark)">
 <title>Claude no celular</title>
 <style>
-  :root { --bg:#f6f5f2; --card:#fff; --txt:#1f1e1c; --sub:#6b6862; --brd:#dedbd5; --acc:#c96442; --acc-txt:#fff; --ok:#2f8a4c; --err:#b3261e; --sel:#fbe9e2; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#1b1a19; --card:#262523; --txt:#ecebe8; --sub:#a29f98; --brd:#3a3835; --acc:#d97757; --acc-txt:#1b1a19; --ok:#5cbf7a; --err:#f2827a; --sel:#3d2b24; } }
+  :root { color-scheme:light dark; --bg:#faf9f5; --card:#fff; --txt:#1f1e1d; --sub:#6b6a65;
+    --brd:rgba(31,30,29,.14); --brd-forte:rgba(31,30,29,.3); --acc:#c96442; --acc-txt:#fff; --acc-ink:#a8502f;
+    --ok:#237a3e; --err:#b3261e; --sel:#f8e9e2; --press:rgba(31,30,29,.05);
+    --r-lg:22px; --r-md:16px; --sombra:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.05); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1f1e1d; --card:#2b2a28; --txt:#f3f1ea; --sub:#a6a39a;
+    --brd:rgba(236,235,232,.12); --brd-forte:rgba(236,235,232,.3); --acc:#d97757; --acc-txt:#1f1e1d; --acc-ink:#e08a6d;
+    --ok:#5cbf7a; --err:#f2827a; --sel:#3d2b24; --press:rgba(255,255,255,.06); --sombra:0 1px 2px rgba(0,0,0,.3); } }
   * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  main { max-width:560px; margin:0 auto; padding:20px 16px 48px; }
-  h1 { font-size:20px; margin:4px 0 16px; }
-  .card { background:var(--card); border:1px solid var(--brd); border-radius:14px; padding:16px; margin-bottom:14px; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%; -webkit-tap-highlight-color:transparent; }
+  button, a, summary { touch-action:manipulation; }
+  :focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  main { max-width:560px; margin:0 auto; min-height:100dvh; display:flex; flex-direction:column;
+    padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); }
+  main:has(.cmp-dock) { padding-bottom:0; }
+  h1 { font:500 24px/1.2 ui-serif,"New York",Georgia,serif; letter-spacing:-.01em; margin:4px 0 18px; }
+  h2 { font-size:13px; font-weight:600; margin:26px 4px 8px; color:var(--sub); }
+  p { margin:0 0 12px; }
+  .card { background:var(--card); border:1px solid var(--brd); border-radius:var(--r-lg); padding:18px; margin:0 0 14px; box-shadow:var(--sombra); }
+  .card > :first-child { margin-top:0 } .card > :last-child { margin-bottom:0 }
+  .card > .btn { margin-top:12px }
   .sub { color:var(--sub); font-size:14px; }
-  .q-title { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--sub); margin-bottom:4px; }
-  .q-text { font-weight:600; margin-bottom:12px; }
-  .opt { display:block; width:100%; text-align:left; padding:12px 14px; margin:8px 0; border-radius:10px; border:1px solid var(--brd); background:transparent; color:var(--txt); font:inherit; cursor:pointer; }
+  .q-title { font-size:13px; font-weight:600; color:var(--sub); margin-bottom:4px; }
+  .q-text { font:500 18px/1.35 ui-serif,"New York",Georgia,serif; margin-bottom:12px; }
+  .opt { position:relative; display:block; width:100%; min-height:52px; text-align:left; padding:13px 48px 13px 16px; margin:8px 0;
+    border-radius:var(--r-md); border:1px solid var(--brd); background:var(--card); color:var(--txt); font:inherit; cursor:pointer; transition:background .15s,border-color .15s; }
+  .opt::after { content:""; position:absolute; right:14px; top:50%; width:22px; height:22px; margin-top:-11px; border-radius:50%; border:1.5px solid var(--brd-forte); }
+  .opt.multi::after { border-radius:7px; }
   .opt small { display:block; color:var(--sub); font-size:13px; margin-top:2px; }
   .opt[aria-pressed="true"] { border-color:var(--acc); background:var(--sel); }
-  textarea, input[type=text] { width:100%; font:inherit; color:var(--txt); background:transparent; border:1px solid var(--brd); border-radius:10px; padding:10px 12px; }
+  .opt[aria-pressed="true"]::after { border-color:var(--acc); background:var(--acc) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/14px no-repeat; }
+  .opt:disabled { cursor:default; opacity:.55; }
+  .opt[aria-pressed="true"]:disabled { opacity:1; }
+  textarea, input[type=text] { width:100%; font:inherit; color:var(--txt); background:transparent; border:1px solid var(--brd); border-radius:var(--r-md); padding:12px 14px; }
   textarea { min-height:72px; resize:vertical; margin-top:6px; }
-  .btn { display:inline-block; width:100%; padding:14px; border:0; border-radius:12px; background:var(--acc); color:var(--acc-txt); font:600 16px system-ui,sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
-  .btn.sec { background:transparent; color:var(--txt); border:1px solid var(--brd); font-weight:500; }
+  textarea:focus, input[type=text]:focus { outline:none; border-color:var(--acc); box-shadow:0 0 0 3px var(--sel); }
+  .btn { display:inline-flex; align-items:center; justify-content:center; width:100%; min-height:50px; padding:12px 18px; border:0; border-radius:999px;
+    background:var(--acc); color:var(--acc-txt); font:600 16px system-ui,sans-serif; cursor:pointer; text-align:center; text-decoration:none; transition:transform .1s,filter .1s; }
+  .btn.sec { background:var(--card); color:var(--txt); border:1px solid var(--brd); font-weight:500; }
+  .btn.txt { background:transparent; color:var(--err); font-weight:500; }
   .btn:disabled { opacity:.5; }
-  .row { display:flex; gap:10px; margin-top:12px; }
+  .btn:active:not(:disabled), .opt:active:not(:disabled), .item:active { filter:brightness(.96); transform:scale(.99); }
   .ok { color:var(--ok); font-weight:600; }
   .err { color:var(--err); }
-  code { font-size:13px; word-break:break-all; }
+  .faixa { padding:12px 14px; border-radius:var(--r-md); background:var(--sel); margin-bottom:14px; font-size:14px; }
+  .voltar { display:inline-flex; align-items:center; align-self:flex-start; min-height:44px; margin:-8px 0 4px; color:var(--acc-ink); text-decoration:none; font-weight:600; }
+  .resp { white-space:pre-wrap; }
+  .chip { display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid var(--brd); background:var(--card); color:var(--sub); font-size:13px; }
+  .chip::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--ok); }
+  /* caixa de entrada: lista agrupada */
+  .lista { background:var(--card); border:1px solid var(--brd); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--sombra); }
+  .lista > p { margin:0; padding:16px; }
+  .item { display:flex; align-items:center; gap:12px; width:100%; min-height:60px; margin:0; padding:12px 14px 12px 16px; border:0; border-radius:0;
+    background:transparent; color:var(--txt); font:inherit; text-align:left; cursor:pointer; }
+  .item + .item { border-top:1px solid var(--brd); }
+  .item.pend::before { content:""; flex:none; width:8px; height:8px; border-radius:50%; background:var(--acc); }
+  .item-txt { flex:1; min-width:0; }
+  .item-tit { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-weight:500; }
+  .item-txt .sub { display:block; margin-top:2px; }
+  .item-seta { color:var(--sub); font-size:22px; line-height:1; }
+  /* configurar avisos */
+  details > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; min-height:44px; cursor:pointer; font-weight:600; }
+  details > summary::-webkit-details-marker { display:none; }
+  details > summary::after { content:""; width:9px; height:9px; margin-right:6px; border:solid var(--sub); border-width:0 2px 2px 0; transform:rotate(45deg); transition:transform .2s; }
+  details[open] > summary::after { transform:rotate(-135deg); }
+  .passo { display:flex; gap:12px; padding:16px 0; border-top:1px solid var(--brd); }
+  .passo-n { flex:none; width:28px; height:28px; border-radius:50%; background:var(--sel); color:var(--acc-ink); font:600 14px/28px system-ui,sans-serif; text-align:center; }
+  .passo-c { flex:1; min-width:0; } .passo-c > :last-child { margin-bottom:0; }
+  #topico { display:block; padding:10px 12px; border-radius:12px; background:var(--bg); border:1px solid var(--brd); font:13px ui-monospace,Menlo,monospace; word-break:break-all; margin-bottom:10px; }
+  /* pareamento */
+  .codigo { text-align:center; font:600 20px/1.2 ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase; padding:14px 12px; background:var(--bg); margin-bottom:10px; }
+  label.q-text { display:block; }
+  /* imagens */
+  .card > a > img { width:100%; height:auto; border-radius:14px; display:block; }
+  dialog.zoom { border:0; padding:0; background:transparent; max-width:100vw; max-height:100dvh; }
+  dialog.zoom::backdrop { background:rgba(0,0,0,.88); }
+  dialog.zoom img { display:block; max-width:100vw; max-height:100dvh; object-fit:contain; }
+  /* caixa de mensagem (estilo Claude) */
+  .cmp-dock { position:sticky; bottom:0; margin-top:auto; padding:12px 0 max(12px, env(safe-area-inset-bottom)); background:linear-gradient(to top, var(--bg) 75%, transparent); }
+  .cmp { border:1px solid var(--brd); border-radius:var(--r-lg); background:var(--card); padding:10px 10px 8px 14px; box-shadow:var(--sombra); }
+  .cmp:focus-within { border-color:var(--acc); }
+  .cmp-fotos { display:flex; gap:8px; overflow-x:auto; padding-bottom:8px; }
+  .cmp-fotos:empty { display:none; }
+  .cmp-foto { position:relative; flex:0 0 auto; width:72px; height:72px; border-radius:12px; overflow:hidden; border:1px solid var(--brd); }
+  .cmp-foto img { width:100%; height:100%; object-fit:cover; display:block; }
+  .cmp-foto button { position:absolute; top:0; right:0; z-index:0; width:36px; height:36px; border:0; background:transparent; color:#fff; font-size:12px; padding:0 0 8px 8px; cursor:pointer; }
+  .cmp-foto button::before { content:""; position:absolute; top:4px; right:4px; width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.65); z-index:-1; }
+  .cmp-txt { overflow-y:hidden; display:block; width:100%; border:0; padding:4px 0; margin:0; min-height:26px; max-height:160px; resize:none; outline:none; background:transparent; color:var(--txt); font:inherit; }
+  .cmp-txt:focus { box-shadow:none; }
+  .cmp-barra { display:flex; align-items:center; justify-content:space-between; margin-top:6px; }
+  .cmp-ico, .cmp-enviar { position:relative; width:36px; height:36px; border-radius:50%; display:grid; place-items:center; cursor:pointer; padding:0; }
+  .cmp-ico::after, .cmp-enviar::after { content:""; position:absolute; inset:-4px; }
+  .cmp-ico { border:1px solid var(--brd); background:transparent; color:var(--txt); }
+  .cmp-ico:disabled { opacity:.35; }
+  .cmp-enviar { border:0; background:var(--acc); color:var(--acc-txt); }
+  .cmp-enviar:disabled { opacity:.35; cursor:default; }
+  .cmp-dica { flex:1; color:var(--sub); font-size:13px; padding:0 10px; }
+  .cmp-dock > p { margin:6px 14px 0; font-size:13px; } .cmp-dock > p:empty { display:none; }
 </style>
 </head>
 <body>
@@ -37,48 +116,305 @@ import * as c from './cifra.js'
 
 const app = document.getElementById('app')
 const LS = 'claude-celular'
+const LS_HIST = 'claude-celular-historico'
 const PADRAO_SERVIDOR = 'https://ntfy.sh'
+const MAX_FOTOS = 4
+const MAX_LADO = 1600
+const MAX_BYTES = 3 * 1024 * 1024
+const COMPLEMENTO_MS = 24 * 3600 * 1000
+const MAX_HIST = 60
+const ANDROID = /Android/i.test(navigator.userAgent)
 
 const el = (tag, attrs = {}, ...kids) => {
   const e = document.createElement(tag)
   for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'onclick' || k === 'oninput') e[k] = v
-    else if (v !== undefined && v !== false) e.setAttribute(k, v === true ? '' : v)
+    if (k.startsWith('on')) e[k] = v
+    else if (v !== undefined && v !== false && v !== null) e.setAttribute(k, v === true ? '' : v)
   }
   for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k.nodeType ? k : String(k))
   return e
 }
-// replaceChildren escreveria "null" na tela para um filho ausente: filtra antes.
-const tela = (...kids) => { app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false)) }
-
-function lerConfig() {
-  try { return JSON.parse(localStorage.getItem(LS) || 'null') } catch { return null }
+// replaceChildren escreveria "null" para um filho ausente: filtra antes. Cada tela nova começa no topo.
+const tela = (...kids) => {
+  app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false))
+  window.scrollTo(0, 0)
 }
-function salvarConfig(cfg) {
-  try { localStorage.setItem(LS, JSON.stringify(cfg)); return true } catch { return false }
+const voltar = () => el('a', { class: 'voltar', href: '#' }, '← Caixa de entrada')
+const quando = t => {
+  const min = Math.round((Date.now() - t) / 60000)
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.round(min / 60)
+  return h < 24 ? `há ${h} h` : new Date(t).toLocaleDateString('pt-BR')
 }
 
-let params = new URLSearchParams(location.hash.slice(1))
-let idPergunta = params.get('id')
-let servidorDoLink = params.get('s')
+// Cada navegação ganha um número: uma tela que terminou de carregar depois de outra não a sobrescreve.
+let vez = 0
+
+// ---------- configuração e histórico (só neste celular) ----------
+
+function lerConfig() { try { return JSON.parse(localStorage.getItem(LS) || 'null') } catch { return null } }
+function salvarConfig(cfg) { try { localStorage.setItem(LS, JSON.stringify(cfg)); return true } catch { return false } }
+function lerHist() { try { return JSON.parse(localStorage.getItem(LS_HIST) || '[]') } catch { return [] } }
+function salvarHist(h) {
+  const manter = h.slice(0, MAX_HIST)
+  for (const sai of h.slice(MAX_HIST)) idb.apagarDe(sai.id)
+  try { localStorage.setItem(LS_HIST, JSON.stringify(manter)) } catch { /* cheio: segue sem histórico */ }
+}
+const doHist = id => lerHist().find(x => x.id === id)
+function registrar(id, dados) {
+  const h = lerHist()
+  const i = h.findIndex(x => x.id === id)
+  const novo = { ...(i >= 0 ? h[i] : {}), ...dados, id }
+  if (i >= 0) h.splice(i, 1)
+  h.unshift(novo)
+  salvarHist(h)
+  return novo
+}
+
+// Imagens guardadas no celular (IndexedDB): continuam visíveis depois que o servidor apaga (3 h).
+const idb = (() => {
+  let db
+  const abrir = () => db || (db = new Promise((res, rej) => {
+    const r = indexedDB.open('claude-celular', 1)
+    r.onupgradeneeded = () => r.result.createObjectStore('imagens')
+    r.onsuccess = () => res(r.result)
+    r.onerror = () => rej(r.error)
+  }))
+  const op = async (modo, fn) => {
+    const d = await abrir()
+    return new Promise((res, rej) => {
+      const t = d.transaction('imagens', modo)
+      const req = fn(t.objectStore('imagens'))
+      t.oncomplete = () => res(req && req.result)
+      t.onerror = () => rej(t.error)
+    })
+  }
+  return {
+    get: k => op('readonly', s => s.get(k)).catch(() => undefined),
+    put: (k, v) => op('readwrite', s => s.put(v, k)).catch(() => undefined),
+    apagarDe: id => op('readwrite', s => s.delete(IDBKeyRange.bound(`${id}:`, `${id}:￿`))).catch(() => undefined),
+    limpar: () => op('readwrite', s => s.clear()).catch(() => undefined),
+  }
+})()
+
+// ---------- rede (ntfy) ----------
+
+async function mensagens(cfg, sufixo) {
+  const r = await fetch(`${cfg.servidor}/${cfg.topico}${sufixo}/json?poll=1&since=12h`, { cache: 'no-store' })
+  if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+  return (await r.text()).split('\n').filter(Boolean)
+    .map(l => { try { return JSON.parse(l) } catch { return null } })
+    .filter(m => m && m.event === 'message')
+}
+async function corpo(m) {
+  if (m.attachment?.url) {
+    const r = await fetch(m.attachment.url, { cache: 'no-store' })
+    return r.ok ? r.text() : undefined
+  }
+  return m.message
+}
+async function buscar(cfg, sufixo, titulo) {
+  const m = [...(await mensagens(cfg, sufixo))].reverse().find(x => x.title === titulo)
+  return m ? corpo(m) : undefined
+}
+
+/** Status que o PC publica (respondida, respondida no PC, encerrada, complemento). */
+async function statusTodos(cfg, k) {
+  const mapa = new Map()
+  try {
+    for (const m of await mensagens(cfg, '-s')) {
+      const s = c.abrir(k, `s:${m.title}`, m.message)
+      if (!s || s.id !== m.title) continue
+      const atual = mapa.get(s.id) || {}
+      if (s.estado === 'complemento') mapa.set(s.id, { ...atual, complemento: true })
+      else mapa.set(s.id, { ...atual, estado: s.estado, em: s.em, resumo: s.resumo ?? atual.resumo })
+    }
+  } catch { /* sem status: usa só o histórico local */ }
+  return mapa
+}
+
+async function carregarPergunta(cfg, k, id) {
+  const local = doHist(id)
+  if (local?.q) return local.q
+  const env = await buscar(cfg, '-q', id)
+  const q = env && c.abrir(k, `q:${id}`, env)
+  if (q && q.id === id) { registrar(id, { q, vistaEm: Date.now() }); return q }
+  return undefined
+}
+
+async function imagem(cfg, k, chaveCache, sufixo, titulo, contexto, mime) {
+  const guardada = await idb.get(chaveCache)
+  if (guardada) return guardada
+  const env = await buscar(cfg, sufixo, titulo)
+  const bytes = env && c.abrirBytes(k, contexto, env)
+  if (!bytes || c.tipoImagem(bytes) !== mime) return undefined
+  const blob = new Blob([bytes], { type: mime })
+  await idb.put(chaveCache, blob)
+  return blob
+}
+
+/** Amplia a imagem na própria página (abrir blob: numa aba nova é instável no Chrome do iPhone). */
+function ampliar(url, alt) {
+  const d = el('dialog', { class: 'zoom', 'aria-label': alt, onclick: () => d.close() }, el('img', { src: url, alt }))
+  d.addEventListener('close', () => d.remove())
+  document.body.append(d)
+  d.showModal()
+}
+
+function cardImagem(promessa, nome) {
+  const caixa = el('div', { class: 'card' }, el('p', { class: 'sub' }, `Carregando ${nome || 'imagem'}…`))
+  promessa.then(blob => {
+    if (!blob) throw new Error('sem imagem')
+    const url = URL.createObjectURL(blob)
+    caixa.replaceChildren(
+      el('a', { href: url, onclick: e => { e.preventDefault(); ampliar(url, nome || 'imagem') } }, el('img', { src: url, alt: nome || 'imagem' })),
+      el('p', { class: 'sub', style: 'margin-top:10px' }, `${nome || 'imagem'} · toque para ampliar`),
+    )
+  }).catch(() => caixa.replaceChildren(el('p', { class: 'err' }, `Não consegui abrir ${nome || 'a imagem'} (imagens ficam 3 h no servidor).`)))
+  return caixa
+}
+
+const imagensDaPergunta = (cfg, k, id, q) => (q.imagens || []).map(img =>
+  cardImagem(imagem(cfg, k, `${id}:q:${img.n}`, '-a', `${id}:${img.n}`, `i:${id}:${img.n}`, img.mime), img.nome))
+
+// ---------- fotos ----------
+
+/** Reduz para no máx. 1600 px e regrava em JPEG: fica leve e sem metadados (GPS). */
+async function prepararFoto(arquivo) {
+  try {
+    const bmp = await createImageBitmap(arquivo, { imageOrientation: 'from-image' })
+    const escala = Math.min(1, MAX_LADO / Math.max(bmp.width, bmp.height))
+    const w = Math.max(1, Math.round(bmp.width * escala))
+    const h = Math.max(1, Math.round(bmp.height * escala))
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h)
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85))
+    if (blob) return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/jpeg' }
+  } catch { /* navegador sem createImageBitmap: usa o original se couber */ }
+  const bytes = new Uint8Array(await arquivo.arrayBuffer())
+  const mime = c.tipoImagem(bytes)
+  if (!mime || bytes.length > MAX_BYTES) throw new Error('foto grande demais ou formato não suportado')
+  return { bytes, mime }
+}
+
+/** Cifra e sobe as fotos; resposta usa "ri", complemento usa "rif". */
+async function subirFotos(cfg, k, id, fotos, complemento) {
+  const out = []
+  for (let n = 0; n < fotos.length; n++) {
+    const ctx = complemento ? `rif:${id}:${n}` : `ri:${id}:${n}`
+    const titulo = complemento ? `${id}:f${n}` : `${id}:${n}`
+    const env = c.selarBytes(k, ctx, fotos[n].bytes)
+    const up = await fetch(`${cfg.servidor}/${cfg.topico}-ra?title=${encodeURIComponent(titulo)}`, { method: 'POST', body: env })
+    if (!up.ok) throw new Error(`foto ${n + 1}: ntfy respondeu ${up.status}`)
+    await idb.put(`${id}:${complemento ? 'c' : 'r'}:${n}`, new Blob([fotos[n].bytes], { type: fotos[n].mime }))
+    out.push({ n, mime: fotos[n].mime, nome: fotos[n].nome.slice(0, 80) })
+  }
+  return out
+}
+
+async function enviarCifrado(cfg, k, id, obj) {
+  const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: c.selar(k, `r:${id}`, { v: 1, id, em: Date.now(), ...obj }) })
+  if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+}
+
+// ---------- caixa de mensagem (estilo Claude) ----------
+
+const ICONES = {
+  mais: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  enviar: '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>',
+}
+const icone = nome => { const s = document.createElement('span'); s.innerHTML = ICONES[nome]; return s.firstChild }
+
+/**
+ * Texto que cresce, fotos em miniatura dentro, "+" (no iPhone abre Fototeca /
+ * Tirar Foto / Escolher Arquivo) e a seta de enviar. Fica presa ao rodapé.
+ */
+function caixaMensagem({ placeholder, rotulo, podeEnviar = () => false, aoEnviar }) {
+  const fotos = []
+  const status = el('p', { class: 'sub', role: 'status' })
+  const grade = el('div', { class: 'cmp-fotos' })
+  const txt = el('textarea', { class: 'cmp-txt', rows: '1', placeholder, maxlength: '2000', 'aria-label': placeholder })
+  const entrada = el('input', { type: 'file', accept: 'image/*', multiple: true, style: 'display:none' })
+  const mais = el('button', { class: 'cmp-ico', type: 'button', 'aria-label': 'Adicionar foto' }, icone('mais'))
+  const dica = el('span', { class: 'cmp-dica' })
+  const enviar = el('button', { class: 'cmp-enviar', type: 'button', 'aria-label': rotulo }, icone('enviar'))
+  let ocupado = false
+  const atualizar = () => {
+    mais.disabled = ocupado || fotos.length >= MAX_FOTOS
+    dica.textContent = fotos.length ? `${fotos.length}/${MAX_FOTOS} foto${fotos.length > 1 ? 's' : ''}` : ''
+    enviar.disabled = ocupado || !(txt.value.trim() || fotos.length || podeEnviar())
+  }
+  const crescer = () => { txt.style.height = 'auto'; txt.style.height = `${Math.min(160, txt.scrollHeight)}px`; txt.style.overflowY = txt.scrollHeight > 160 ? 'auto' : 'hidden' }
+  txt.oninput = () => { crescer(); atualizar() }
+  const desenhar = () => {
+    grade.replaceChildren(...fotos.map((f, i) => el('div', { class: 'cmp-foto' },
+      el('img', { src: f.url, alt: f.nome }),
+      el('button', { type: 'button', 'aria-label': `Remover ${f.nome}`, onclick: () => { URL.revokeObjectURL(f.url); fotos.splice(i, 1); desenhar() } }, '✕'),
+    )))
+    atualizar()
+  }
+  mais.onclick = () => entrada.click()
+  entrada.addEventListener('change', async () => {
+    const escolhidas = [...(entrada.files || [])]
+    const lista = escolhidas.slice(0, MAX_FOTOS - fotos.length)
+    entrada.value = ''
+    status.className = 'sub'; status.textContent = 'Preparando fotos…'
+    const erros = []
+    for (const arq of lista) {
+      try {
+        const f = await prepararFoto(arq)
+        fotos.push({ ...f, nome: arq.name || 'foto.jpg', url: URL.createObjectURL(new Blob([f.bytes], { type: f.mime })) })
+      } catch (e) { erros.push(`${arq.name}: ${e.message || e}`) }
+    }
+    const sobra = escolhidas.length - lista.length
+    const avisos = [...erros, sobra > 0 ? `${sobra} foto${sobra > 1 ? 's' : ''} ficou de fora (máx. ${MAX_FOTOS})` : null].filter(Boolean)
+    status.className = avisos.length ? 'err' : 'sub'
+    status.textContent = avisos.join(' · ')
+    desenhar()
+  })
+  enviar.onclick = async () => {
+    if (enviar.disabled) return
+    ocupado = true; atualizar()
+    status.className = 'sub'; status.textContent = fotos.length ? 'Cifrando e enviando…' : 'Enviando…'
+    try { await aoEnviar({ texto: txt.value.trim(), fotos }) } catch (e) {
+      status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}`
+      ocupado = false; atualizar()
+    }
+  }
+  atualizar()
+  return {
+    el: el('div', { class: 'cmp-dock' }, el('div', { class: 'cmp' }, grade, txt, entrada, el('div', { class: 'cmp-barra' }, mais, dica, enviar)), status),
+    atualizar,
+  }
+}
 
 // ---------- pareamento ----------
 
 function telaPareamento(msg) {
-  const input = el('input', { type: 'text', placeholder: 'XXXX-XXXX-XXXX', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', inputmode: 'text' })
-  const status = el('p', { class: 'sub' }, msg || 'Digite o código que aparece no painel "Celular" do Claude Code (comando /celular parear).')
-  const btn = el('button', { class: 'btn', onclick: async () => {
+  const status = el('p', { class: 'sub', id: 'codigo-st', role: 'status' }, msg || 'Digite o código que aparece no painel "Celular" do Claude Code (comando /celular parear).')
+  const btn = el('button', { class: 'btn' }, 'Parear')
+  const input = el('input', { id: 'codigo', class: 'codigo', type: 'text', placeholder: 'XXXX-XXXX-XXXX', autocomplete: 'off', autocapitalize: 'characters',
+    autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'go', 'aria-describedby': 'codigo-st', onkeydown: e => { if (e.key === 'Enter') btn.click() } })
+  btn.onclick = async () => {
     const codigo = c.normalizarCodigo(input.value)
     if (!codigo) { status.className = 'err'; status.textContent = 'Código inválido: são 12 letras e números.'; return }
     btn.disabled = true; status.className = 'sub'; status.textContent = 'Gerando a chave…'
     await new Promise(r => setTimeout(r, 30))
-    const mestra = c.mestraDoCodigo(codigo)
-    const k = c.chaves(mestra)
-    const cfg = { mestra: c.toHex(mestra), topico: k.topico, servidor: servidorDoLink || PADRAO_SERVIDOR, pareadoEm: Date.now() }
-    if (!salvarConfig(cfg)) { status.className = 'err'; status.textContent = 'O navegador não deixou guardar a chave (modo anônimo?).'; btn.disabled = false; return }
-    telaPareado(true)
-  } }, 'Parear')
-  tela(el('div', { class: 'card' }, el('p', {}, 'Código de pareamento'), input, status, btn))
+    try {
+      const mestra = c.mestraDoCodigo(codigo)
+      const k = c.chaves(mestra)
+      const cfg = { mestra: c.toHex(mestra), topico: k.topico, servidor: servidorDoLink || PADRAO_SERVIDOR, pareadoEm: Date.now() }
+      if (!salvarConfig(cfg)) throw new Error('O navegador não deixou guardar a chave (modo anônimo?).')
+    } catch (e) {
+      status.className = 'err'; status.textContent = e.message || String(e); btn.disabled = false
+      return
+    }
+    // Veio de um aviso? Vai direto para a pergunta.
+    if (idPergunta) telaPergunta(lerConfig(), idPergunta); else telaInicio(true)
+  }
+  tela(el('div', { class: 'card' }, el('label', { class: 'q-text', for: 'codigo' }, 'Código de pareamento'), input, status, btn))
 }
 
 function linkNtfy(cfg) {
@@ -89,7 +425,6 @@ function linkNtfy(cfg) {
 async function copiar(texto, botao) {
   let ok = false
   try { await navigator.clipboard.writeText(texto); ok = true } catch {
-    // navegador sem área de transferência: seleciona o texto para copiar na mão
     const r = document.createRange(); const alvo = document.getElementById('topico')
     if (alvo) { r.selectNodeContents(alvo); const s = getSelection(); s.removeAllRanges(); s.addRange(r) }
   }
@@ -102,156 +437,264 @@ async function testarAviso(cfg, status, botao) {
   botao.disabled = true
   status.className = 'sub'; status.textContent = 'Enviando…'
   try {
-    // Título e mensagem no endereço: pedido simples, sem bloqueio de navegador.
     const q = new URLSearchParams({ title: 'Teste de inscrição', message: 'Se este aviso chegou, a inscrição está funcionando ✓', tags: 'white_check_mark' })
     const r = await fetch(`${cfg.servidor}/${cfg.topico}?${q}`, { method: 'POST' })
     if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
     status.className = 'ok'
     status.textContent = 'Enviado. O aviso deve aparecer em alguns segundos. Não chegou? Confira os passos 2 e 3 e se o app ntfy pode mostrar notificações.'
-  } catch (e) {
-    status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}`
-  } finally {
-    botao.disabled = false
-  }
+  } catch (e) { status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}` } finally { botao.disabled = false }
 }
 
-function telaPareado(agora) {
-  const cfg = lerConfig()
-  const statusTeste = el('p', { class: 'sub' })
-  const btnCopiar = el('button', { class: 'btn sec', onclick: e => copiar(cfg.topico, e.currentTarget) }, 'Copiar tópico')
-  const btnTeste = el('button', { class: 'btn', onclick: e => testarAviso(cfg, statusTeste, e.currentTarget) }, 'Testar aviso')
-  const passo = (n, titulo, ...corpo) => el('div', { class: 'card' }, el('div', { class: 'q-title' }, `Passo ${n}`), el('div', { class: 'q-text' }, titulo), ...corpo)
-  tela(
-    el('p', { class: 'ok' }, agora ? 'Pareado ✓ Agora inscreva o app ntfy:' : 'Este celular está pareado ✓'),
+function blocoConfigurar(cfg, aberto) {
+  const statusTeste = el('p', { class: 'sub', role: 'status' })
+  const passo = (n, titulo, ...corpo) => el('div', { class: 'passo' },
+    el('span', { class: 'passo-n' }, n), el('div', { class: 'passo-c' }, el('div', { class: 'q-text' }, titulo), ...corpo))
+  return el('details', aberto ? { open: true } : {},
+    el('summary', {}, 'Configurar avisos no app ntfy'),
     passo(1, 'Instale o app ntfy',
-      el('p', { class: 'sub' }, 'Grátis na Play Store e na App Store. Permita as notificações quando ele pedir.'),
-      el('a', { class: 'btn sec', href: 'https://docs.ntfy.sh/subscribe/phone/', target: '_blank', rel: 'noopener' }, 'Onde baixar'),
-    ),
+      el('p', { class: 'sub' }, 'Grátis na App Store e na Play Store. Permita as notificações quando ele pedir.'),
+      el('a', { class: 'btn sec', href: 'https://docs.ntfy.sh/subscribe/phone/', target: '_blank', rel: 'noopener' }, 'Onde baixar')),
     passo(2, 'Copie o nome do tópico',
-      el('p', {}, el('code', { id: 'topico' }, cfg.topico)),
-      btnCopiar,
-    ),
+      el('code', { id: 'topico' }, cfg.topico),
+      el('button', { class: 'btn sec', onclick: e => copiar(cfg.topico, e.currentTarget) }, 'Copiar tópico')),
     passo(3, 'Inscreva-se no app',
       el('p', { class: 'sub' }, 'No ntfy, toque em "+", cole o tópico em "Topic name", deixe o servidor padrão (ntfy.sh) e toque em "Subscribe".'),
-      el('a', { class: 'sub', href: linkNtfy(cfg) }, 'No Android, dá para tentar abrir direto no app'),
-    ),
-    passo(4, 'Teste o aviso', btnTeste, statusTeste),
-    el('p', { class: 'sub' }, 'Guarde esta página nos favoritos. As perguntas abrem por aqui pelo botão "Responder" do aviso.'),
-    el('button', { class: 'btn sec', onclick: () => { if (confirm('Desparear este celular?')) { localStorage.removeItem(LS); telaPareamento() } } }, 'Desparear este celular'),
+      ANDROID ? el('a', { class: 'btn sec', href: linkNtfy(cfg) }, 'Abrir direto no app') : null),
+    passo(4, 'Teste o aviso',
+      el('button', { class: 'btn', onclick: e => testarAviso(cfg, statusTeste, e.currentTarget) }, 'Testar aviso'), statusTeste),
+    el('p', { class: 'sub', style: 'margin:4px 0 0' }, 'Dica: guarde esta página nos favoritos do mesmo navegador que abre os links. Tocar no aviso abre só o app ntfy; o botão "Responder" abre a pergunta aqui.'),
   )
 }
 
+// ---------- caixa de entrada ----------
+
+let atualizarInicio
+async function telaInicio(primeiraVez) {
+  const minha = vez
+  const cfg = lerConfig()
+  const k = c.chaves(c.fromHex(cfg.mestra))
+  const pendentesBox = el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…'))
+  const respondidasBox = el('div', { class: 'lista' })
+  tela(
+    el('p', {}, el('span', { class: 'chip' }, primeiraVez ? 'Pareado agora' : 'Celular pareado')),
+    el('h2', {}, 'Esperando você'), pendentesBox,
+    el('h2', {}, 'Respondidas'), respondidasBox,
+    el('h2', {}, 'Configuração'),
+    el('div', { class: 'card' }, blocoConfigurar(cfg, primeiraVez || lerHist().length === 0)),
+    el('button', { class: 'btn txt', onclick: async () => {
+      if (!confirm('Desparear este celular? O histórico de respostas e as fotos guardadas neste aparelho serão apagados.')) return
+      localStorage.removeItem(LS); localStorage.removeItem(LS_HIST); await idb.limpar(); telaPareamento()
+    } }, 'Desparear este celular'),
+  )
+  const item = (h, pendente) => {
+    const p0 = h.q?.perguntas?.[0]
+    return el('button', { class: pendente ? 'item pend' : 'item', onclick: () => { location.hash = `id=${h.id}` } },
+      el('span', { class: 'item-txt' },
+        el('span', { class: 'item-tit' }, p0?.titulo || p0?.texto || 'Pergunta'),
+        el('span', { class: 'sub' }, [h.q?.projeto, (h.q?.imagens || []).length ? `${h.q.imagens.length} imagem(ns)` : null, quando(h.em || h.vistaEm || Date.now())].filter(Boolean).join(' · '))),
+      el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
+  }
+  const desenharRespondidas = st => {
+    const resp = lerHist().filter(h => h.resposta || st.has(h.id)).slice(0, 20)
+    respondidasBox.replaceChildren(...(resp.length ? resp.map(h => item({ ...h, em: h.respondidaEm || h.vistaEm }, false)) : [el('p', { class: 'sub' }, 'Nada respondido ainda.')]))
+  }
+  desenharRespondidas(new Map()) // na hora, só com o histórico deste celular
+
+  atualizarInicio = async () => {
+    if (minha !== vez) return
+    const st = await statusTodos(cfg, k)
+    let pend = []
+    try {
+      for (const m of await mensagens(cfg, '-q')) {
+        const id = m.title
+        if (!id) continue
+        const local = doHist(id)
+        if (local?.resposta) continue
+        let q = local?.q
+        if (!q) {
+          const env = await corpo(m)
+          q = env && c.abrir(k, `q:${id}`, env)
+          if (!q || q.id !== id) continue
+          registrar(id, { q, vistaEm: m.time * 1000 })
+        }
+        if (st.has(id)) continue // respondida no PC (ou por outro aparelho): vai para "Respondidas"
+        if (q.exp && Date.now() > q.exp) continue
+        pend.push({ id, q, em: m.time * 1000 })
+      }
+    } catch (e) {
+      if (minha !== vez) return
+      desenharRespondidas(st)
+      pendentesBox.replaceChildren(el('p', { class: 'err' }, `Sem conexão com o servidor de avisos: ${e.message || e}`),
+        el('p', {}, el('button', { class: 'btn sec', onclick: () => atualizarInicio() }, 'Tentar de novo')))
+      return
+    }
+    if (minha !== vez) return
+    pend = pend.sort((a, b) => b.em - a.em)
+    pendentesBox.replaceChildren(...(pend.length ? pend.map(h => item(h, true)) : [el('p', { class: 'sub' }, 'Nenhuma pergunta esperando. 🎉')]))
+    desenharRespondidas(st)
+  }
+  await atualizarInicio()
+}
+// Com a caixa de entrada à vista, atualiza a cada 20 s e ao voltar para a página.
+const tentarAtualizar = () => { if (!idPergunta && atualizarInicio && document.visibilityState === 'visible' && lerConfig()) atualizarInicio() }
+setInterval(tentarAtualizar, 20000)
+document.addEventListener('visibilitychange', tentarAtualizar)
+
 // ---------- pergunta ----------
 
-async function buscarPergunta(cfg, id, sufixo = '-q') {
-  const url = `${cfg.servidor}/${cfg.topico}${sufixo}/json?poll=1&since=12h`
-  const r = await fetch(url, { cache: 'no-store' })
-  if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
-  const linhas = (await r.text()).split('\n').filter(Boolean)
-  for (let i = linhas.length - 1; i >= 0; i--) {
-    let m
-    try { m = JSON.parse(linhas[i]) } catch { continue }
-    if (m.event !== 'message' || m.title !== id) continue
-    let corpo = m.message
-    if (m.attachment?.url) corpo = await (await fetch(m.attachment.url, { cache: 'no-store' })).text()
-    return corpo
-  }
-  return undefined
-}
-
-async function telaPergunta(cfg, id) {
+async function telaPergunta(cfg, id, faixa) {
+  const minha = vez
   tela(el('p', { class: 'sub' }, 'Buscando a pergunta…'))
   const k = c.chaves(c.fromHex(cfg.mestra))
-  let corpo
-  try { corpo = await buscarPergunta(cfg, id) } catch (e) {
-    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Não consegui falar com o servidor de avisos.'), el('p', { class: 'sub' }, String(e.message || e))))
+  let q, st
+  try {
+    ;[q, st] = await Promise.all([carregarPergunta(cfg, k, id), statusTodos(cfg, k)])
+  } catch (e) {
+    if (minha !== vez) return
+    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Não consegui falar com o servidor de avisos.'), el('p', { class: 'sub' }, String(e.message || e))))
   }
-  const q = corpo && c.abrir(k, `q:${id}`, corpo)
-  if (!q || q.id !== id) {
-    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Pergunta não encontrada ou não pôde ser aberta.'), el('p', { class: 'sub' }, 'Ela pode ter expirado, ou este celular foi pareado com outro código.')))
+  if (minha !== vez) return
+  if (!q) {
+    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Pergunta não encontrada ou não pôde ser aberta.'), el('p', { class: 'sub' }, 'Ela pode ter expirado, ou este celular foi pareado com outro código.')))
   }
+  const local = doHist(id)
+  const s = st.get(id)
+  if (local?.resposta || s?.estado) return telaRespondida(cfg, k, id, q, s, local, faixa)
   if (q.exp && Date.now() > q.exp) {
-    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Esta pergunta expirou.'), el('p', { class: 'sub' }, 'Responda na mesa ou espere uma nova.')))
+    return tela(voltar(), el('div', { class: 'faixa' }, 'Esta pergunta expirou sem resposta.'), ...imagensDaPergunta(cfg, k, id, q),
+      ...q.perguntas.map(p => el('div', { class: 'card' }, p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null, el('div', { class: 'q-text' }, p.texto))))
   }
+  return telaFormulario(cfg, k, id, q)
+}
 
-  // Imagens: cada uma vem cifrada num anexo do tópico "-a"; decifra e mostra.
-  const imagens = (q.imagens || []).map(img => {
-    const caixa = el('div', { class: 'card' }, el('p', { class: 'sub' }, `Carregando ${img.nome || 'imagem'}…`))
-    ;(async () => {
-      try {
-        const env = await buscarPergunta(cfg, `${id}:${img.n}`, '-a')
-        const bytes = env && c.abrirBytes(k, `i:${id}:${img.n}`, env)
-        if (!bytes || c.tipoImagem(bytes) !== img.mime) throw new Error('não abriu')
-        const url = URL.createObjectURL(new Blob([bytes], { type: img.mime }))
-        caixa.replaceChildren(
-          el('a', { href: url, target: '_blank', rel: 'noopener' }, el('img', { src: url, alt: img.nome || 'imagem', style: 'width:100%;height:auto;border-radius:10px;display:block' })),
-          el('p', { class: 'sub' }, `${img.nome || 'imagem'} · toque para ampliar`),
-        )
-      } catch {
-        caixa.replaceChildren(el('p', { class: 'err' }, `Não consegui abrir ${img.nome || 'a imagem'} (pode ter expirado: imagens ficam 3 h no servidor).`))
-      }
-    })()
-    return caixa
-  })
-
+function telaFormulario(cfg, k, id, q) {
   const soMensagem = q.origem === 'mensagem' && q.perguntas.every(p => !(p.opcoes || []).length)
   const estado = q.perguntas.map(() => ({ escolhas: new Set(), texto: '' }))
   const cards = q.perguntas.map((p, i) => {
     const botoes = (p.opcoes || []).map(o => {
-      const b = el('button', { class: 'opt', 'aria-pressed': 'false', onclick: () => {
-        const s = estado[i].escolhas
-        if (p.multipla) { s.has(o.rotulo) ? s.delete(o.rotulo) : s.add(o.rotulo) }
-        else { const tinha = s.has(o.rotulo); s.clear(); if (!tinha) s.add(o.rotulo) }
-        for (const x of botoes) x.setAttribute('aria-pressed', String(s.has(x.dataset.rotulo)))
+      const b = el('button', { class: p.multipla ? 'opt multi' : 'opt', 'aria-pressed': 'false', onclick: () => {
+        const sel = estado[i].escolhas
+        if (p.multipla) { sel.has(o.rotulo) ? sel.delete(o.rotulo) : sel.add(o.rotulo) } else { const tinha = sel.has(o.rotulo); sel.clear(); if (!tinha) sel.add(o.rotulo) }
+        for (const x of botoes) x.setAttribute('aria-pressed', String(sel.has(x.dataset.rotulo)))
       } }, o.rotulo, o.descricao ? el('small', {}, o.descricao) : null)
       b.dataset.rotulo = o.rotulo
       return b
     })
-    const txt = el('textarea', { placeholder: (p.opcoes || []).length ? 'Outra resposta (opcional)' : soMensagem ? 'Responder (opcional)' : 'Sua resposta', maxlength: '2000', oninput: e => { estado[i].texto = e.target.value } })
+    // Várias perguntas: cada uma tem seu campo de texto. Uma só: o texto vai na caixa de baixo.
+    const txt = q.perguntas.length > 1 && p.livre !== false
+      ? el('textarea', { placeholder: 'Outra resposta (opcional)', maxlength: '2000', 'aria-label': `Outra resposta para: ${p.texto}`, oninput: e => { estado[i].texto = e.target.value } })
+      : null
     return el('div', { class: 'card' },
       p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
       el('div', { class: 'q-text' }, p.texto),
       p.multipla ? el('p', { class: 'sub' }, 'Pode marcar mais de uma.') : null,
-      botoes,
-      p.livre === false ? null : txt,
-    )
+      botoes, txt)
   })
+  const temOpcoes = q.perguntas.some(p => (p.opcoes || []).length)
+  const caixa = caixaMensagem({
+    placeholder: q.perguntas.length > 1 ? 'Comentário geral ou foto (opcional)' : soMensagem ? 'Responder (opcional)' : temOpcoes ? 'Escreva algo ou anexe foto (opcional)' : 'Sua resposta',
+    rotulo: 'Enviar resposta',
+    podeEnviar: () => estado.some(x => x.escolhas.size > 0 || x.texto.trim()),
+    aoEnviar: async ({ texto, fotos }) => {
+      const minha = vez
+      const respostas = estado.map(x => ({ escolhas: [...x.escolhas], texto: x.texto.trim() }))
+      if (texto) {
+        const ult = respostas[respostas.length - 1]
+        ult.texto = [ult.texto, texto].filter(Boolean).join(' — ')
+      }
+      const imagens = await subirFotos(cfg, k, id, fotos, false)
+      await enviarCifrado(cfg, k, id, { respostas, imagens: imagens.length ? imagens : undefined })
+      registrar(id, { q, resposta: { respostas, imagens }, respondidaEm: Date.now() })
+      if (minha === vez) telaRespondida(cfg, k, id, q, undefined, doHist(id), 'Resposta enviada ✓ O Claude recebe em alguns segundos.')
+    },
+  })
+  // escolher uma opção já libera a seta de enviar
+  for (const card of cards) card.addEventListener('click', () => caixa.atualizar())
+  tela(voltar(), q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null, ...imagensDaPergunta(cfg, k, id, q), ...cards,
+    soMensagem ? el('p', { class: 'sub' }, 'Não precisa responder.') : null, caixa.el)
+}
 
-  const status = el('p', { class: 'sub' })
-  const enviar = el('button', { class: 'btn', onclick: async () => {
-    const respostas = estado.map(s => ({ escolhas: [...s.escolhas], texto: s.texto.trim() }))
-    if (respostas.every(r => r.escolhas.length === 0 && !r.texto)) { status.className = 'err'; status.textContent = 'Escolha uma opção ou escreva uma resposta.'; return }
-    enviar.disabled = true; status.className = 'sub'; status.textContent = 'Enviando…'
-    try {
-      const corpoResp = c.selar(k, `r:${id}`, { v: 1, id, em: Date.now(), respostas })
-      const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: corpoResp })
-      if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
-      tela(el('div', { class: 'card' }, el('p', { class: 'ok' }, 'Resposta enviada ✓'), el('p', { class: 'sub' }, 'O Claude recebe em alguns segundos. Pode fechar esta página.')))
-    } catch (e) {
-      enviar.disabled = false; status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}`
-    }
-  } }, 'Enviar resposta')
+/** Já respondida: só leitura (pergunta, imagens, sua resposta, suas fotos) e um único complemento. */
+function telaRespondida(cfg, k, id, q, s, local, faixa) {
+  const resp = local?.resposta
+  const cancelada = !resp && s?.estado === 'cancelada'
+  const ondeResp = resp ? 'Respondida aqui no celular' : s?.estado === 'respondida-no-pc' ? 'Respondida no PC' : cancelada ? 'Encerrada no PC (sem resposta)' : 'Respondida no celular'
+  const quandoResp = local?.respondidaEm || s?.em
+  const cards = q.perguntas.map((p, i) => {
+    const r = resp?.respostas?.[i]
+    const escolhidas = new Set(r?.escolhas || [])
+    return el('div', { class: 'card' },
+      p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
+      el('div', { class: 'q-text' }, p.texto),
+      ...(p.opcoes || []).map(o => el('button', { class: p.multipla ? 'opt multi' : 'opt', disabled: true, 'aria-pressed': String(escolhidas.has(o.rotulo)) }, o.rotulo)),
+      r?.texto ? el('p', { class: 'resp', style: 'margin-top:10px' }, `Você escreveu: ${r.texto}`) : null)
+  })
+  const minhasFotos = (resp?.imagens || []).map(img => cardImagem(idb.get(`${id}:r:${img.n}`), `Sua foto: ${img.nome}`))
+  const resumoPc = !resp && s?.resumo ? el('div', { class: 'card' }, el('div', { class: 'q-title' }, 'Resposta'), el('p', { class: 'resp' }, s.resumo)) : null
 
-  tela(
+  // Complemento: um só, até 24 h depois da resposta, e não para perguntas encerradas sem resposta.
+  let blocoComp
+  let ehCaixa = false
+  const comp = local?.complemento
+  if (comp) {
+    blocoComp = el('div', { class: 'card' }, el('div', { class: 'q-title' }, 'Seu complemento'),
+      comp.texto ? el('p', { class: 'resp' }, comp.texto) : null,
+      ...(comp.imagens || []).map(img => cardImagem(idb.get(`${id}:c:${img.n}`), img.nome)))
+  } else if (s?.complemento) {
+    blocoComp = el('p', { class: 'sub' }, 'Complemento já enviado.')
+  } else if (cancelada || !quandoResp || Date.now() - quandoResp > COMPLEMENTO_MS) {
+    blocoComp = el('p', { class: 'sub' }, 'Esta pergunta não aceita mais complemento.')
+  } else {
+    ehCaixa = true
+    blocoComp = caixaMensagem({
+      placeholder: 'Acrescentar algo à resposta (só uma vez)',
+      rotulo: 'Enviar complemento',
+      aoEnviar: async ({ texto, fotos }) => {
+        const minha = vez
+        const imagens = await subirFotos(cfg, k, id, fotos, true)
+        await enviarCifrado(cfg, k, id, { complemento: true, texto, imagens: imagens.length ? imagens : undefined })
+        registrar(id, { complemento: { texto, imagens, em: Date.now() } })
+        if (minha === vez) telaRespondida(cfg, k, id, q, s, doHist(id), 'Complemento enviado ✓')
+      },
+    }).el
+  }
+
+  tela(voltar(),
+    faixa ? el('div', { class: 'faixa', role: 'status' }, faixa) : null,
+    el('p', { class: cancelada ? 'sub' : 'ok' }, `${cancelada ? '' : '✓ '}${ondeResp}${quandoResp ? ` · ${quando(quandoResp)}` : ''}`),
     q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null,
-    ...imagens,
-    ...cards,
-    soMensagem ? el('p', { class: 'sub' }, 'Não precisa responder. Se quiser, escreva acima e envie.') : null,
-    status,
-    enviar,
-  )
+    ...imagensDaPergunta(cfg, k, id, q), ...cards, resumoPc, ...minhasFotos,
+    ehCaixa ? null : el('h2', {}, 'Complemento'), blocoComp)
+}
+
+// ---------- uma aba só ----------
+// Ao abrir uma aba nova desta página, as antigas tentam se fechar (o navegador
+// só deixa quando a aba foi aberta por um link externo); se não der, avisam.
+const minhaAba = Math.random().toString(36).slice(2)
+const canal = 'BroadcastChannel' in window ? new BroadcastChannel('claude-celular') : null
+if (canal) {
+  canal.onmessage = ev => {
+    if (ev.data?.tipo !== 'nova-aba' || ev.data.aba === minhaAba) return
+    try { window.close() } catch { /* sem permissão */ }
+    setTimeout(() => {
+      if (!document.getElementById('aba-velha')) app.prepend(el('div', { class: 'faixa', id: 'aba-velha', role: 'status' }, 'Esta página abriu de novo em outra aba. Pode fechar esta.'))
+    }, 300)
+  }
+  canal.postMessage({ tipo: 'nova-aba', aba: minhaAba })
 }
 
 // ---------- início ----------
 
+let params, idPergunta, servidorDoLink
 function iniciar() {
+  vez++
   params = new URLSearchParams(location.hash.slice(1))
   idPergunta = params.get('id')
   servidorDoLink = params.get('s')
   const cfg = lerConfig()
   if (!cfg || !cfg.mestra || !cfg.topico) telaPareamento(idPergunta ? 'Pareie este celular primeiro para responder.' : undefined)
   else if (idPergunta) telaPergunta(cfg, idPergunta)
-  else telaPareado(false)
+  else telaInicio(false)
 }
 
 // Um aviso novo com a página já aberta só troca o "#id=...": recarrega a tela.
