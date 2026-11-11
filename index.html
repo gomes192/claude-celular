@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#1f1e1d" media="(prefers-color-scheme: dark)">
-<title>Claude no celular</title>
+<title>Claudinho</title>
 <style>
   :root { color-scheme:light dark; --bg:#faf9f5; --card:#fff; --txt:#1f1e1d; --sub:#6b6a65;
     --brd:rgba(31,30,29,.14); --brd-forte:rgba(31,30,29,.3); --acc:#c96442; --acc-txt:#fff; --acc-ink:#a8502f;
@@ -136,7 +136,7 @@ const el = (tag, attrs = {}, ...kids) => {
 }
 // replaceChildren escreveria "null" para um filho ausente: filtra antes. Cada tela nova começa no topo.
 const tela = (...kids) => {
-  app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false))
+  app.replaceChildren(el('h1', {}, 'Claudinho'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false))
   window.scrollTo(0, 0)
 }
 const voltar = () => el('a', { class: 'voltar', href: '#' }, '← Caixa de entrada')
