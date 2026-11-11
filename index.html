@@ -125,7 +125,8 @@ const LS_ENV = 'claude-celular-enviadas'
 const PADRAO_SERVIDOR = 'https://ntfy.sh'
 const MAX_FOTOS = 4
 const MAX_LADO = 1600
-const MAX_BYTES = 3 * 1024 * 1024
+// O ntfy.sh aceita anexos de até 2 MB e a foto vai cifrada em base64url (+33%).
+const MAX_BYTES = Math.floor(1.4 * 1024 * 1024)
 const COMPLEMENTO_MS = 24 * 3600 * 1000
 const MAX_HIST = 60
 const ANDROID = /Android/i.test(navigator.userAgent)
@@ -351,8 +352,11 @@ async function prepararFoto(arquivo) {
     const canvas = document.createElement('canvas')
     canvas.width = w; canvas.height = h
     canvas.getContext('2d').drawImage(bmp, 0, 0, w, h)
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.85))
-    if (blob) return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/jpeg' }
+    // Qualidade menor só se precisar caber no limite do ntfy.
+    for (const q of [0.85, 0.7, 0.55]) {
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', q))
+      if (blob && blob.size <= MAX_BYTES) return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/jpeg' }
+    }
   } catch { /* navegador sem createImageBitmap: usa o original se couber */ }
   const bytes = new Uint8Array(await arquivo.arrayBuffer())
   const mime = c.tipoImagem(bytes)
