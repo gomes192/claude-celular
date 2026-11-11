@@ -235,23 +235,38 @@ function fluxo(kEnc, nonce, n) {
   return out
 }
 
-/** Cifra e assina bytes (uma imagem, por exemplo) para o `contexto`. */
-export function selarBytes(k, contexto, claro) {
+/** Cifra e assina bytes; devolve o envelope binário (versão || nonce || cifrado || tag). */
+export function selarCru(k, contexto, claro) {
   const nonce = aleatorio(16)
   const ks = fluxo(k.enc, nonce, claro.length)
   const cifrado = new Uint8Array(claro.length)
   for (let i = 0; i < claro.length; i++) cifrado[i] = claro[i] ^ ks[i]
   const tag = hmac(k.mac, concat(utf8(contexto), new Uint8Array([0]), nonce, cifrado))
-  return toB64url(concat(new Uint8Array([VERSAO]), nonce, cifrado, tag))
+  return concat(new Uint8Array([VERSAO]), nonce, cifrado, tag)
 }
 
-/** Confere e decifra bytes; devolve undefined se a assinatura ou o contexto não baterem. */
+/** Cifra e assina bytes (uma imagem, por exemplo) para o `contexto`; envelope em base64url. */
+export function selarBytes(k, contexto, claro) {
+  return toB64url(selarCru(k, contexto, claro))
+}
+
+/**
+ * Confere e decifra bytes; aceita o envelope em base64url (texto) ou binário
+ * (Uint8Array). Devolve undefined se a assinatura ou o contexto não baterem.
+ */
 export function abrirBytes(k, contexto, envelope) {
   let b
-  try {
-    b = fromB64url(String(envelope || '').trim())
-  } catch {
-    return undefined
+  if (envelope instanceof Uint8Array) {
+    b = envelope[0] === VERSAO ? envelope : undefined
+    // binário que na verdade é texto base64url (anexos antigos)
+    if (!b) envelope = fromUtf8(envelope)
+  }
+  if (!b) {
+    try {
+      b = fromB64url(String(envelope || '').trim())
+    } catch {
+      return undefined
+    }
   }
   if (b.length < 1 + 16 + 32 || b[0] !== VERSAO) return undefined
   const nonce = b.subarray(1, 17)

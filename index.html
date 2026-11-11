@@ -200,12 +200,22 @@ const idb = (() => {
 
 // ---------- rede (ntfy) ----------
 
-async function mensagens(cfg, sufixo) {
-  const r = await fetch(`${cfg.servidor}/${cfg.topico}${sufixo}/json?poll=1&since=12h`, { cache: 'no-store' })
-  if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
-  return (await r.text()).split('\n').filter(Boolean)
-    .map(l => { try { return JSON.parse(l) } catch { return null } })
-    .filter(m => m && m.event === 'message')
+// A lista de cada tópico é reaproveitada por 10 s: várias imagens não baixam a lista várias vezes.
+const listas = new Map()
+function mensagens(cfg, sufixo) {
+  const chave = `${cfg.topico}${sufixo}`
+  const guardada = listas.get(chave)
+  if (guardada && Date.now() - guardada.t < 10000) return guardada.p
+  const p = (async () => {
+    const r = await fetch(`${cfg.servidor}/${cfg.topico}${sufixo}/json?poll=1&since=12h`, { cache: 'no-store' })
+    if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+    return (await r.text()).split('\n').filter(Boolean)
+      .map(l => { try { return JSON.parse(l) } catch { return null } })
+      .filter(m => m && m.event === 'message')
+  })()
+  listas.set(chave, { t: Date.now(), p })
+  p.catch(() => listas.delete(chave))
+  return p
 }
 async function corpo(m) {
   if (m.attachment?.url) {
@@ -217,6 +227,16 @@ async function corpo(m) {
 async function buscar(cfg, sufixo, titulo) {
   const m = [...(await mensagens(cfg, sufixo))].reverse().find(x => x.title === titulo)
   return m ? corpo(m) : undefined
+}
+/** Anexo como bytes (o PC manda as imagens em binário: menor e sem base64). */
+async function buscarBytes(cfg, sufixo, titulo) {
+  const m = [...(await mensagens(cfg, sufixo))].reverse().find(x => x.title === titulo)
+  if (!m) return undefined
+  if (m.attachment?.url) {
+    const r = await fetch(m.attachment.url, { cache: 'no-store' })
+    return r.ok ? new Uint8Array(await r.arrayBuffer()) : undefined
+  }
+  return m.message
 }
 
 /** Status que o PC publica (respondida, respondida no PC, encerrada, complemento). */
@@ -246,7 +266,7 @@ async function carregarPergunta(cfg, k, id) {
 async function imagem(cfg, k, chaveCache, sufixo, titulo, contexto, mime) {
   const guardada = await idb.get(chaveCache)
   if (guardada) return guardada
-  const env = await buscar(cfg, sufixo, titulo)
+  const env = await buscarBytes(cfg, sufixo, titulo)
   const bytes = env && c.abrirBytes(k, contexto, env)
   if (!bytes || c.tipoImagem(bytes) !== mime) return undefined
   const blob = new Blob([bytes], { type: mime })
@@ -462,7 +482,7 @@ function blocoConfigurar(cfg, aberto) {
       ANDROID ? el('a', { class: 'btn sec', href: linkNtfy(cfg) }, 'Abrir direto no app') : null),
     passo(4, 'Teste o aviso',
       el('button', { class: 'btn', onclick: e => testarAviso(cfg, statusTeste, e.currentTarget) }, 'Testar aviso'), statusTeste),
-    el('p', { class: 'sub', style: 'margin:4px 0 0' }, 'Dica: guarde esta página nos favoritos do mesmo navegador que abre os links. Tocar no aviso abre só o app ntfy; o botão "Responder" abre a pergunta aqui.'),
+    el('p', { class: 'sub', style: 'margin:4px 0 0' }, 'Dica: guarde esta página nos favoritos do mesmo navegador que abre os links. Tocar no aviso (ou no botão "Responder") abre a pergunta aqui.'),
   )
 }
 
