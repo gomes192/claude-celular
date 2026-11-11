@@ -235,10 +235,9 @@ function fluxo(kEnc, nonce, n) {
   return out
 }
 
-/** Cifra e assina `obj` (JSON) para o `contexto`. */
-export function selar(k, contexto, obj) {
+/** Cifra e assina bytes (uma imagem, por exemplo) para o `contexto`. */
+export function selarBytes(k, contexto, claro) {
   const nonce = aleatorio(16)
-  const claro = utf8(JSON.stringify(obj))
   const ks = fluxo(k.enc, nonce, claro.length)
   const cifrado = new Uint8Array(claro.length)
   for (let i = 0; i < claro.length; i++) cifrado[i] = claro[i] ^ ks[i]
@@ -246,8 +245,8 @@ export function selar(k, contexto, obj) {
   return toB64url(concat(new Uint8Array([VERSAO]), nonce, cifrado, tag))
 }
 
-/** Confere e decifra; devolve undefined se a assinatura ou o contexto não baterem. */
-export function abrir(k, contexto, envelope) {
+/** Confere e decifra bytes; devolve undefined se a assinatura ou o contexto não baterem. */
+export function abrirBytes(k, contexto, envelope) {
   let b
   try {
     b = fromB64url(String(envelope || '').trim())
@@ -263,9 +262,31 @@ export function abrir(k, contexto, envelope) {
   const ks = fluxo(k.enc, nonce, cifrado.length)
   const claro = new Uint8Array(cifrado.length)
   for (let i = 0; i < cifrado.length; i++) claro[i] = cifrado[i] ^ ks[i]
+  return claro
+}
+
+/** Cifra e assina `obj` (JSON) para o `contexto`. */
+export function selar(k, contexto, obj) {
+  return selarBytes(k, contexto, utf8(JSON.stringify(obj)))
+}
+
+/** Confere e decifra JSON; devolve undefined se a assinatura ou o contexto não baterem. */
+export function abrir(k, contexto, envelope) {
+  const claro = abrirBytes(k, contexto, envelope)
+  if (!claro) return undefined
   try {
     return JSON.parse(fromUtf8(claro))
   } catch {
     return undefined
   }
+}
+
+/** Tipo da imagem pelos primeiros bytes (não confia na extensão). */
+export function tipoImagem(b) {
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'image/png'
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg'
+  if (b.length > 6 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38) return 'image/gif'
+  if (b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 &&
+      b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp'
+  return undefined
 }

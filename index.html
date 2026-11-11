@@ -143,8 +143,8 @@ function telaPareado(agora) {
 
 // ---------- pergunta ----------
 
-async function buscarPergunta(cfg, id) {
-  const url = `${cfg.servidor}/${cfg.topico}-q/json?poll=1&since=12h`
+async function buscarPergunta(cfg, id, sufixo = '-q') {
+  const url = `${cfg.servidor}/${cfg.topico}${sufixo}/json?poll=1&since=12h`
   const r = await fetch(url, { cache: 'no-store' })
   if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
   const linhas = (await r.text()).split('\n').filter(Boolean)
@@ -174,6 +174,27 @@ async function telaPergunta(cfg, id) {
     return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Esta pergunta expirou.'), el('p', { class: 'sub' }, 'Responda na mesa ou espere uma nova.')))
   }
 
+  // Imagens: cada uma vem cifrada num anexo do tópico "-a"; decifra e mostra.
+  const imagens = (q.imagens || []).map(img => {
+    const caixa = el('div', { class: 'card' }, el('p', { class: 'sub' }, `Carregando ${img.nome || 'imagem'}…`))
+    ;(async () => {
+      try {
+        const env = await buscarPergunta(cfg, `${id}:${img.n}`, '-a')
+        const bytes = env && c.abrirBytes(k, `i:${id}:${img.n}`, env)
+        if (!bytes || c.tipoImagem(bytes) !== img.mime) throw new Error('não abriu')
+        const url = URL.createObjectURL(new Blob([bytes], { type: img.mime }))
+        caixa.replaceChildren(
+          el('a', { href: url, target: '_blank', rel: 'noopener' }, el('img', { src: url, alt: img.nome || 'imagem', style: 'width:100%;height:auto;border-radius:10px;display:block' })),
+          el('p', { class: 'sub' }, `${img.nome || 'imagem'} · toque para ampliar`),
+        )
+      } catch {
+        caixa.replaceChildren(el('p', { class: 'err' }, `Não consegui abrir ${img.nome || 'a imagem'} (pode ter expirado: imagens ficam 3 h no servidor).`))
+      }
+    })()
+    return caixa
+  })
+
+  const soMensagem = q.origem === 'mensagem' && q.perguntas.every(p => !(p.opcoes || []).length)
   const estado = q.perguntas.map(() => ({ escolhas: new Set(), texto: '' }))
   const cards = q.perguntas.map((p, i) => {
     const botoes = (p.opcoes || []).map(o => {
@@ -186,7 +207,7 @@ async function telaPergunta(cfg, id) {
       b.dataset.rotulo = o.rotulo
       return b
     })
-    const txt = el('textarea', { placeholder: (p.opcoes || []).length ? 'Outra resposta (opcional)' : 'Sua resposta', maxlength: '2000', oninput: e => { estado[i].texto = e.target.value } })
+    const txt = el('textarea', { placeholder: (p.opcoes || []).length ? 'Outra resposta (opcional)' : soMensagem ? 'Responder (opcional)' : 'Sua resposta', maxlength: '2000', oninput: e => { estado[i].texto = e.target.value } })
     return el('div', { class: 'card' },
       p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
       el('div', { class: 'q-text' }, p.texto),
@@ -213,7 +234,9 @@ async function telaPergunta(cfg, id) {
 
   tela(
     q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null,
+    ...imagens,
     ...cards,
+    soMensagem ? el('p', { class: 'sub' }, 'Não precisa responder. Se quiser, escreva acima e envie.') : null,
     status,
     enviar,
   )
