@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Claude no celular</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --txt:#1f1e1c; --sub:#6b6862; --brd:#dedbd5; --acc:#c96442; --acc-txt:#fff; --ok:#2f8a4c; --err:#b3261e; --sel:#fbe9e2; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1b1a19; --card:#262523; --txt:#ecebe8; --sub:#a29f98; --brd:#3a3835; --acc:#d97757; --acc-txt:#1b1a19; --ok:#5cbf7a; --err:#f2827a; --sel:#3d2b24; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--txt); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:20px; margin:4px 0 16px; }
+  .card { background:var(--card); border:1px solid var(--brd); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .sub { color:var(--sub); font-size:14px; }
+  .q-title { font-size:13px; text-transform:uppercase; letter-spacing:.04em; color:var(--sub); margin-bottom:4px; }
+  .q-text { font-weight:600; margin-bottom:12px; }
+  .opt { display:block; width:100%; text-align:left; padding:12px 14px; margin:8px 0; border-radius:10px; border:1px solid var(--brd); background:transparent; color:var(--txt); font:inherit; cursor:pointer; }
+  .opt small { display:block; color:var(--sub); font-size:13px; margin-top:2px; }
+  .opt[aria-pressed="true"] { border-color:var(--acc); background:var(--sel); }
+  textarea, input[type=text] { width:100%; font:inherit; color:var(--txt); background:transparent; border:1px solid var(--brd); border-radius:10px; padding:10px 12px; }
+  textarea { min-height:72px; resize:vertical; margin-top:6px; }
+  .btn { display:inline-block; width:100%; padding:14px; border:0; border-radius:12px; background:var(--acc); color:var(--acc-txt); font:600 16px system-ui,sans-serif; cursor:pointer; text-align:center; text-decoration:none; }
+  .btn.sec { background:transparent; color:var(--txt); border:1px solid var(--brd); font-weight:500; }
+  .btn:disabled { opacity:.5; }
+  .row { display:flex; gap:10px; margin-top:12px; }
+  .ok { color:var(--ok); font-weight:600; }
+  .err { color:var(--err); }
+  code { font-size:13px; word-break:break-all; }
+</style>
+</head>
+<body>
+<main id="app"><p class="sub">Carregando…</p></main>
+<script type="module">
+import * as c from './cifra.js'
+
+const app = document.getElementById('app')
+const LS = 'claude-celular'
+const PADRAO_SERVIDOR = 'https://ntfy.sh'
+
+const el = (tag, attrs = {}, ...kids) => {
+  const e = document.createElement(tag)
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'onclick' || k === 'oninput') e[k] = v
+    else if (v !== undefined && v !== false) e.setAttribute(k, v === true ? '' : v)
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k.nodeType ? k : String(k))
+  return e
+}
+const tela = (...kids) => { app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids) }
+
+function lerConfig() {
+  try { return JSON.parse(localStorage.getItem(LS) || 'null') } catch { return null }
+}
+function salvarConfig(cfg) {
+  try { localStorage.setItem(LS, JSON.stringify(cfg)); return true } catch { return false }
+}
+
+let params = new URLSearchParams(location.hash.slice(1))
+let idPergunta = params.get('id')
+let servidorDoLink = params.get('s')
+
+// ---------- pareamento ----------
+
+function telaPareamento(msg) {
+  const input = el('input', { type: 'text', placeholder: 'XXXX-XXXX-XXXX', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', inputmode: 'text' })
+  const status = el('p', { class: 'sub' }, msg || 'Digite o código que aparece no painel "Celular" do Claude Code (comando /celular parear).')
+  const btn = el('button', { class: 'btn', onclick: async () => {
+    const codigo = c.normalizarCodigo(input.value)
+    if (!codigo) { status.className = 'err'; status.textContent = 'Código inválido: são 12 letras e números.'; return }
+    btn.disabled = true; status.className = 'sub'; status.textContent = 'Gerando a chave…'
+    await new Promise(r => setTimeout(r, 30))
+    const mestra = c.mestraDoCodigo(codigo)
+    const k = c.chaves(mestra)
+    const cfg = { mestra: c.toHex(mestra), topico: k.topico, servidor: servidorDoLink || PADRAO_SERVIDOR, pareadoEm: Date.now() }
+    if (!salvarConfig(cfg)) { status.className = 'err'; status.textContent = 'O navegador não deixou guardar a chave (modo anônimo?).'; btn.disabled = false; return }
+    telaPareado(true)
+  } }, 'Parear')
+  tela(el('div', { class: 'card' }, el('p', {}, 'Código de pareamento'), input, status, btn))
+}
+
+function linkNtfy(cfg) {
+  const host = cfg.servidor.replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  return `ntfy://${host}/${cfg.topico}`
+}
+
+function telaPareado(agora) {
+  const cfg = lerConfig()
+  tela(
+    el('div', { class: 'card' },
+      el('p', { class: 'ok' }, agora ? 'Pareado ✓' : 'Este celular está pareado ✓'),
+      el('p', { class: 'sub' }, 'Inscreva-se no tópico abaixo no app ntfy para receber os avisos. Depois, no Claude Code, toque em "Enviar teste".'),
+      el('p', {}, el('code', {}, cfg.topico)),
+      el('a', { class: 'btn', href: linkNtfy(cfg) }, 'Inscrever no app ntfy'),
+      el('div', { class: 'row' },
+        el('button', { class: 'btn sec', onclick: () => navigator.clipboard?.writeText(cfg.topico) }, 'Copiar tópico'),
+        el('button', { class: 'btn sec', onclick: () => { if (confirm('Desparear este celular?')) { localStorage.removeItem(LS); telaPareamento() } } }, 'Desparear'),
+      ),
+    ),
+    el('p', { class: 'sub' }, 'Guarde esta página nos favoritos. As perguntas abrem por aqui pelo botão "Responder" do aviso.'),
+  )
+}
+
+// ---------- pergunta ----------
+
+async function buscarPergunta(cfg, id) {
+  const url = `${cfg.servidor}/${cfg.topico}-q/json?poll=1&since=12h`
+  const r = await fetch(url, { cache: 'no-store' })
+  if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+  const linhas = (await r.text()).split('\n').filter(Boolean)
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    let m
+    try { m = JSON.parse(linhas[i]) } catch { continue }
+    if (m.event !== 'message' || m.title !== id) continue
+    let corpo = m.message
+    if (m.attachment?.url) corpo = await (await fetch(m.attachment.url, { cache: 'no-store' })).text()
+    return corpo
+  }
+  return undefined
+}
+
+async function telaPergunta(cfg, id) {
+  tela(el('p', { class: 'sub' }, 'Buscando a pergunta…'))
+  const k = c.chaves(c.fromHex(cfg.mestra))
+  let corpo
+  try { corpo = await buscarPergunta(cfg, id) } catch (e) {
+    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Não consegui falar com o servidor de avisos.'), el('p', { class: 'sub' }, String(e.message || e))))
+  }
+  const q = corpo && c.abrir(k, `q:${id}`, corpo)
+  if (!q || q.id !== id) {
+    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Pergunta não encontrada ou não pôde ser aberta.'), el('p', { class: 'sub' }, 'Ela pode ter expirado, ou este celular foi pareado com outro código.')))
+  }
+  if (q.exp && Date.now() > q.exp) {
+    return tela(el('div', { class: 'card' }, el('p', { class: 'err' }, 'Esta pergunta expirou.'), el('p', { class: 'sub' }, 'Responda na mesa ou espere uma nova.')))
+  }
+
+  const estado = q.perguntas.map(() => ({ escolhas: new Set(), texto: '' }))
+  const cards = q.perguntas.map((p, i) => {
+    const botoes = (p.opcoes || []).map(o => {
+      const b = el('button', { class: 'opt', 'aria-pressed': 'false', onclick: () => {
+        const s = estado[i].escolhas
+        if (p.multipla) { s.has(o.rotulo) ? s.delete(o.rotulo) : s.add(o.rotulo) }
+        else { const tinha = s.has(o.rotulo); s.clear(); if (!tinha) s.add(o.rotulo) }
+        for (const x of botoes) x.setAttribute('aria-pressed', String(s.has(x.dataset.rotulo)))
+      } }, o.rotulo, o.descricao ? el('small', {}, o.descricao) : null)
+      b.dataset.rotulo = o.rotulo
+      return b
+    })
+    const txt = el('textarea', { placeholder: (p.opcoes || []).length ? 'Outra resposta (opcional)' : 'Sua resposta', maxlength: '2000', oninput: e => { estado[i].texto = e.target.value } })
+    return el('div', { class: 'card' },
+      p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
+      el('div', { class: 'q-text' }, p.texto),
+      p.multipla ? el('p', { class: 'sub' }, 'Pode marcar mais de uma.') : null,
+      botoes,
+      p.livre === false ? null : txt,
+    )
+  })
+
+  const status = el('p', { class: 'sub' })
+  const enviar = el('button', { class: 'btn', onclick: async () => {
+    const respostas = estado.map(s => ({ escolhas: [...s.escolhas], texto: s.texto.trim() }))
+    if (respostas.every(r => r.escolhas.length === 0 && !r.texto)) { status.className = 'err'; status.textContent = 'Escolha uma opção ou escreva uma resposta.'; return }
+    enviar.disabled = true; status.className = 'sub'; status.textContent = 'Enviando…'
+    try {
+      const corpoResp = c.selar(k, `r:${id}`, { v: 1, id, em: Date.now(), respostas })
+      const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: corpoResp })
+      if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+      tela(el('div', { class: 'card' }, el('p', { class: 'ok' }, 'Resposta enviada ✓'), el('p', { class: 'sub' }, 'O Claude recebe em alguns segundos. Pode fechar esta página.')))
+    } catch (e) {
+      enviar.disabled = false; status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}`
+    }
+  } }, 'Enviar resposta')
+
+  tela(
+    q.projeto ? el('p', { class: 'sub' }, `Projeto: ${q.projeto}`) : null,
+    ...cards,
+    status,
+    enviar,
+  )
+}
+
+// ---------- início ----------
+
+function iniciar() {
+  params = new URLSearchParams(location.hash.slice(1))
+  idPergunta = params.get('id')
+  servidorDoLink = params.get('s')
+  const cfg = lerConfig()
+  if (!cfg || !cfg.mestra || !cfg.topico) telaPareamento(idPergunta ? 'Pareie este celular primeiro para responder.' : undefined)
+  else if (idPergunta) telaPergunta(cfg, idPergunta)
+  else telaPareado(false)
+}
+
+// Um aviso novo com a página já aberta só troca o "#id=...": recarrega a tela.
+window.addEventListener('hashchange', iniciar)
+iniciar()
+</script>
+</body>
+</html>
