@@ -48,7 +48,8 @@ const el = (tag, attrs = {}, ...kids) => {
   for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k.nodeType ? k : String(k))
   return e
 }
-const tela = (...kids) => { app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids) }
+// replaceChildren escreveria "null" na tela para um filho ausente: filtra antes.
+const tela = (...kids) => { app.replaceChildren(el('h1', {}, 'Claude no celular'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false)) }
 
 function lerConfig() {
   try { return JSON.parse(localStorage.getItem(LS) || 'null') } catch { return null }
@@ -85,20 +86,58 @@ function linkNtfy(cfg) {
   return `ntfy://${host}/${cfg.topico}`
 }
 
+async function copiar(texto, botao) {
+  let ok = false
+  try { await navigator.clipboard.writeText(texto); ok = true } catch {
+    // navegador sem área de transferência: seleciona o texto para copiar na mão
+    const r = document.createRange(); const alvo = document.getElementById('topico')
+    if (alvo) { r.selectNodeContents(alvo); const s = getSelection(); s.removeAllRanges(); s.addRange(r) }
+  }
+  const antes = botao.textContent
+  botao.textContent = ok ? 'Copiado ✓' : 'Selecionado: copie'
+  setTimeout(() => { botao.textContent = antes }, 2000)
+}
+
+async function testarAviso(cfg, status, botao) {
+  botao.disabled = true
+  status.className = 'sub'; status.textContent = 'Enviando…'
+  try {
+    // Título e mensagem no endereço: pedido simples, sem bloqueio de navegador.
+    const q = new URLSearchParams({ title: 'Teste de inscrição', message: 'Se este aviso chegou, a inscrição está funcionando ✓', tags: 'white_check_mark' })
+    const r = await fetch(`${cfg.servidor}/${cfg.topico}?${q}`, { method: 'POST' })
+    if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+    status.className = 'ok'
+    status.textContent = 'Enviado. O aviso deve aparecer em alguns segundos. Não chegou? Confira os passos 2 e 3 e se o app ntfy pode mostrar notificações.'
+  } catch (e) {
+    status.className = 'err'; status.textContent = `Não enviou: ${e.message || e}`
+  } finally {
+    botao.disabled = false
+  }
+}
+
 function telaPareado(agora) {
   const cfg = lerConfig()
+  const statusTeste = el('p', { class: 'sub' })
+  const btnCopiar = el('button', { class: 'btn sec', onclick: e => copiar(cfg.topico, e.currentTarget) }, 'Copiar tópico')
+  const btnTeste = el('button', { class: 'btn', onclick: e => testarAviso(cfg, statusTeste, e.currentTarget) }, 'Testar aviso')
+  const passo = (n, titulo, ...corpo) => el('div', { class: 'card' }, el('div', { class: 'q-title' }, `Passo ${n}`), el('div', { class: 'q-text' }, titulo), ...corpo)
   tela(
-    el('div', { class: 'card' },
-      el('p', { class: 'ok' }, agora ? 'Pareado ✓' : 'Este celular está pareado ✓'),
-      el('p', { class: 'sub' }, 'Inscreva-se no tópico abaixo no app ntfy para receber os avisos. Depois, no Claude Code, toque em "Enviar teste".'),
-      el('p', {}, el('code', {}, cfg.topico)),
-      el('a', { class: 'btn', href: linkNtfy(cfg) }, 'Inscrever no app ntfy'),
-      el('div', { class: 'row' },
-        el('button', { class: 'btn sec', onclick: () => navigator.clipboard?.writeText(cfg.topico) }, 'Copiar tópico'),
-        el('button', { class: 'btn sec', onclick: () => { if (confirm('Desparear este celular?')) { localStorage.removeItem(LS); telaPareamento() } } }, 'Desparear'),
-      ),
+    el('p', { class: 'ok' }, agora ? 'Pareado ✓ Agora inscreva o app ntfy:' : 'Este celular está pareado ✓'),
+    passo(1, 'Instale o app ntfy',
+      el('p', { class: 'sub' }, 'Grátis na Play Store e na App Store. Permita as notificações quando ele pedir.'),
+      el('a', { class: 'btn sec', href: 'https://docs.ntfy.sh/subscribe/phone/', target: '_blank', rel: 'noopener' }, 'Onde baixar'),
     ),
+    passo(2, 'Copie o nome do tópico',
+      el('p', {}, el('code', { id: 'topico' }, cfg.topico)),
+      btnCopiar,
+    ),
+    passo(3, 'Inscreva-se no app',
+      el('p', { class: 'sub' }, 'No ntfy, toque em "+", cole o tópico em "Topic name", deixe o servidor padrão (ntfy.sh) e toque em "Subscribe".'),
+      el('a', { class: 'sub', href: linkNtfy(cfg) }, 'No Android, dá para tentar abrir direto no app'),
+    ),
+    passo(4, 'Teste o aviso', btnTeste, statusTeste),
     el('p', { class: 'sub' }, 'Guarde esta página nos favoritos. As perguntas abrem por aqui pelo botão "Responder" do aviso.'),
+    el('button', { class: 'btn sec', onclick: () => { if (confirm('Desparear este celular?')) { localStorage.removeItem(LS); telaPareamento() } } }, 'Desparear este celular'),
   )
 }
 
