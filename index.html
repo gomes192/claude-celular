@@ -87,9 +87,17 @@
   .msg-p .q-text { margin-bottom:8px; }
   .pede { color:var(--acc-ink); font-weight:600; font-size:14px; margin:10px 0 0; }
   .nota { margin:4px 4px 0; font-size:13px; }
-  .fig { margin:8px 0 10px; }
-  .fig img { width:100%; height:auto; border-radius:12px; display:block; }
-  .fig .sub { margin:6px 0 0; font-size:13px; }
+  /* fotos em miniatura; toque amplia */
+  .fig { display:inline-block; vertical-align:top; margin:4px 6px 6px 0; max-width:100%; }
+  .fig img { display:block; width:112px; height:112px; object-fit:cover; border-radius:12px; border:1px solid var(--brd); }
+  .fig > p { margin:0; font-size:12px; }
+  .fig > p.sub { display:grid; place-items:center; width:112px; height:112px; border-radius:12px; background:var(--press); text-align:center; padding:6px; }
+  /* cabeçalho da conversa preso no topo */
+  .conv-topo { position:sticky; top:0; z-index:5; background:var(--bg); margin:-4px calc(-1 * max(16px, env(safe-area-inset-left))) 10px;
+    padding:max(6px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-left)) 8px; border-bottom:1px solid var(--brd); }
+  .conv-topo .voltar { margin:0; min-height:36px; }
+  .conv-topo .conv-cab { margin:0 4px; }
+  .msg { scroll-margin-top:120px; }
   .item-seta { color:var(--sub); font-size:22px; line-height:1; }
   /* configurar avisos */
   details > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; min-height:44px; cursor:pointer; font-weight:600; }
@@ -323,8 +331,8 @@ function figura(promessa, nome) {
     if (!blob) throw new Error('sem imagem')
     const url = URL.createObjectURL(blob)
     caixa.replaceChildren(
-      el('a', { href: url, onclick: e => { e.preventDefault(); ampliar(url, nome || 'imagem') } }, el('img', { src: url, alt: nome || 'imagem' })),
-      el('p', { class: 'sub' }, `${nome || 'imagem'} · toque para ampliar`),
+      el('a', { href: url, title: `${nome || 'imagem'} (toque para ampliar)`, onclick: e => { e.preventDefault(); ampliar(url, nome || 'imagem') } },
+        el('img', { src: url, alt: nome || 'imagem' })),
     )
   }).catch(() => caixa.replaceChildren(el('p', { class: 'err' }, `Não consegui abrir ${nome || 'a imagem'} (imagens ficam 3 h no servidor).`)))
   return caixa
@@ -354,16 +362,19 @@ async function prepararFoto(arquivo) {
   return { bytes, mime }
 }
 
-/** Cifra e sobe as fotos; resposta usa "ri", complemento usa "rif". */
-async function subirFotos(cfg, k, id, fotos, complemento) {
+/**
+ * Cifra e sobe as fotos. Resposta e mensagem: "ri" e título "id:n". Complemento: "rif" com o id próprio
+ * dele (cid), para caberem vários na mesma pergunta.
+ */
+async function subirFotos(cfg, k, id, fotos, cid) {
   const out = []
   for (let n = 0; n < fotos.length; n++) {
-    const ctx = complemento ? `rif:${id}:${n}` : `ri:${id}:${n}`
-    const titulo = complemento ? `${id}:f${n}` : `${id}:${n}`
+    const ctx = cid ? `rif:${id}:${cid}:${n}` : `ri:${id}:${n}`
+    const titulo = cid ? `${cid}:${n}` : `${id}:${n}`
     const env = c.selarBytes(k, ctx, fotos[n].bytes)
     const up = await fetch(`${cfg.servidor}/${cfg.topico}-ra?title=${encodeURIComponent(titulo)}`, { method: 'POST', body: env })
     if (!up.ok) throw new Error(`foto ${n + 1}: ntfy respondeu ${up.status}`)
-    await idb.put(`${id}:${complemento ? 'c' : 'r'}:${n}`, new Blob([fotos[n].bytes], { type: fotos[n].mime }))
+    await idb.put(`${cid || id}:r:${n}`, new Blob([fotos[n].bytes], { type: fotos[n].mime }))
     out.push({ n, mime: fotos[n].mime, nome: fotos[n].nome.slice(0, 80) })
   }
   return out
@@ -382,6 +393,24 @@ const ICONES = {
 }
 const icone = nome => { const s = document.createElement('span'); s.innerHTML = ICONES[nome]; return s.firstChild }
 
+// Teclado do celular: o navegador encolhe só a área visível (visualViewport), e a caixa presa ao
+// rodapé ficaria por baixo do teclado. Ela sobe o tanto que o teclado cobre.
+function acimaDoTeclado() {
+  const vv = window.visualViewport
+  const dock = document.querySelector('.cmp-dock')
+  if (!vv || !dock) return
+  const coberto = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop))
+  dock.style.transform = coberto ? `translateY(-${coberto}px)` : ''
+}
+if (window.visualViewport) {
+  visualViewport.addEventListener('resize', acimaDoTeclado)
+  visualViewport.addEventListener('scroll', acimaDoTeclado)
+}
+/** Ao tocar para escrever: rola até o fim da conversa (a caixa e as últimas mensagens) quando o teclado abre. */
+function rolarAteCaixa() {
+  for (const ms of [50, 350]) setTimeout(() => { window.scrollTo(0, document.documentElement.scrollHeight); acimaDoTeclado() }, ms)
+}
+
 /**
  * Texto que cresce, fotos em miniatura dentro, "+" (no iPhone abre Fototeca /
  * Tirar Foto / Escolher Arquivo) e a seta de enviar. Fica presa ao rodapé.
@@ -390,7 +419,7 @@ function caixaMensagem({ placeholder, rotulo, podeEnviar = () => false, aoEnviar
   const fotos = []
   const status = el('p', { class: 'sub', role: 'status' })
   const grade = el('div', { class: 'cmp-fotos' })
-  const txt = el('textarea', { class: 'cmp-txt', rows: '1', placeholder, maxlength: '2000', 'aria-label': placeholder })
+  const txt = el('textarea', { class: 'cmp-txt', rows: '1', placeholder, maxlength: '2000', 'aria-label': placeholder, onfocus: rolarAteCaixa })
   const entrada = el('input', { type: 'file', accept: 'image/*', multiple: true, style: 'display:none' })
   const mais = el('button', { class: 'cmp-ico', type: 'button', 'aria-label': 'Adicionar foto' }, icone('mais'))
   const dica = el('span', { class: 'cmp-dica' })
@@ -526,13 +555,15 @@ function blocoConfigurar(cfg, aberto) {
 // ---------- conversas ----------
 // Tudo que uma sessão mandou (perguntas e atualizações) e tudo que você escreveu para ela fica
 // numa conversa só, com uma caixa de mensagem só. A caixa decide o que o envio é:
-//   pergunta esperando → resposta a ela; sessão aberta → mensagem; sem sessão → complemento.
+//   pergunta esperando → resposta a ela; sessão aberta → mensagem; sem sessão → complemento (vários).
 
 const momento = h => h.em || h.vistaEm || h.respondidaEm || 0
 /** Pergunta ainda esperando resposta (atualização de status nunca espera). */
 const pendente = (h, st) => h.q.origem !== 'status' && !h.resposta && !st.get(h.id)?.estado && !(h.q.exp && Date.now() > h.q.exp)
 const resumoDe = h => { const p = h.q?.perguntas?.[0]; return (p?.texto || p?.titulo || '').replace(/\s+/g, ' ') }
 const ESTADOS_RESPONDIDA = ['respondida', 'respondida-no-pc']
+/** O que você acrescentou depois de responder: o complemento único das versões antigas e os de agora (cada um com cid). */
+const complementosDe = h => [...(h.complemento ? [h.complemento] : []), ...(h.complementos || [])]
 
 /** Traz o que o PC mandou nas últimas 12 h (perguntas e atualizações) para o histórico deste celular. */
 async function sincronizar(cfg, k) {
@@ -579,7 +610,7 @@ function conversas() {
   for (const cv of mapa.values()) {
     cv.itens.sort((a, b) => momento(a) - momento(b))
     cv.enviadas = cv.sessao ? enviadas.filter(m => m.sessao === cv.sessao).sort((a, b) => a.em - b.em) : []
-    cv.ultima = Math.max(0, ...cv.itens.map(h => Math.max(momento(h), h.respondidaEm || 0, h.complemento?.em || 0)), ...cv.enviadas.map(m => m.em))
+    cv.ultima = Math.max(0, ...cv.itens.map(h => Math.max(momento(h), h.respondidaEm || 0, ...complementosDe(h).map(x => x.em))), ...cv.enviadas.map(m => m.em))
   }
   return [...mapa.values()]
 }
@@ -719,15 +750,16 @@ async function telaConversa(cfg, chave, foco) {
     const agora = Date.now()
     const pend = cv.itens.filter(h => pendente(h, st))
     const sessaoAberta = !!cv.sessao && cv.ate > agora
-    // Sem sessão não há mensagem solta: dá para acrescentar uma vez à última resposta (24 h).
+    // Sem sessão não há mensagem solta: o que você escreve vai como complemento da última resposta
+    // (quantos quiser, por 24 h).
     const respondidas = cv.sessao ? [] : cv.itens.filter(h => h.resposta || ESTADOS_RESPONDIDA.includes(st.get(h.id)?.estado))
     const ultimaResp = respondidas[respondidas.length - 1]
     const quandoResp = ultimaResp && (ultimaResp.respondidaEm || st.get(ultimaResp.id)?.em)
-    const podeComp = !!ultimaResp && !ultimaResp.complemento && !st.get(ultimaResp.id)?.complemento && agora - quandoResp < COMPLEMENTO_MS
-    const recentes = [...cv.itens.filter(h => h.resposta).map(h => h.respondidaEm), ...cv.itens.filter(h => h.complemento).map(h => h.complemento.em), ...cv.enviadas.map(m => m.em)]
+    const podeComp = !!ultimaResp && agora - quandoResp < COMPLEMENTO_MS
+    const recentes = [...cv.itens.filter(h => h.resposta).map(h => h.respondidaEm), ...cv.itens.flatMap(h => complementosDe(h).map(x => x.em)), ...cv.enviadas.map(m => m.em)]
       .some(t => agora - t < 120_000)
     const nova = JSON.stringify([
-      cv.itens.map(h => [h.id, !!h.resposta, !!h.complemento, st.get(h.id)?.estado, !!st.get(h.id)?.complemento]),
+      cv.itens.map(h => [h.id, !!h.resposta, st.get(h.id)?.estado, !!st.get(h.id)?.complemento, complementosDe(h).map(x => [x.cid, st.get(x.cid)?.estado])]),
       cv.enviadas.map(m => [m.id, st.get(m.id)?.estado]),
       sessaoAberta, podeComp, recentes ? Math.floor(agora / 30000) : 0,
     ])
@@ -740,7 +772,7 @@ async function telaConversa(cfg, chave, foco) {
     const cartoes = new Map()
     const textoCaixa = () => alvo
       ? (alvo.q.perguntas.length > 1 ? 'Comentário geral ou foto (opcional)' : (alvo.q.perguntas[0]?.opcoes || []).length ? 'Escolha acima ou escreva sua resposta' : 'Sua resposta')
-      : sessaoAberta ? 'Mensagem para esta sessão' : 'Acrescentar algo à última resposta (uma vez)'
+      : sessaoAberta ? 'Mensagem para esta sessão' : 'Acrescentar algo à última resposta'
     const mirar = h => {
       if (alvo?.id !== h.id) {
         alvo = h
@@ -809,11 +841,10 @@ async function telaConversa(cfg, chave, foco) {
         ...(r.imagens || []).map(img => figura(idb.get(`${h.id}:r:${img.n}`), img.nome)),
         s?.estado === 'respondida-no-pc' ? el('p', { class: 'sub' }, 'Não usada: já tinha sido respondida no PC.') : entrega(s?.estado === 'respondida', h.respondidaEm || momento(h)))
     }
-    const seuComplemento = h => el('div', { class: 'msg eu' },
-      el('div', { class: 'msg-meta' }, 'Complemento'),
-      h.complemento.texto ? el('p', { class: 'resp' }, h.complemento.texto) : null,
-      ...(h.complemento.imagens || []).map(img => figura(idb.get(`${h.id}:c:${img.n}`), img.nome)),
-      entrega(!!st.get(h.id)?.complemento, h.complemento.em))
+    const seuComplemento = (h, x) => el('div', { class: 'msg eu' },
+      x.texto ? el('p', { class: 'resp' }, x.texto) : null,
+      ...(x.imagens || []).map(img => figura(idb.get(x.cid ? `${x.cid}:r:${img.n}` : `${h.id}:c:${img.n}`), img.nome)),
+      entrega(x.cid ? st.get(x.cid)?.estado === 'entregue' : !!st.get(h.id)?.complemento, x.em))
     const suaMensagem = m => el('div', { class: 'msg eu' },
       m.texto ? el('p', { class: 'resp' }, m.texto) : null,
       ...(m.imagens || []).map(img => figura(idb.get(`${m.id}:r:${img.n}`), img.nome)),
@@ -823,7 +854,7 @@ async function telaConversa(cfg, chave, foco) {
     for (const h of cv.itens) {
       blocos.push({ em: momento(h), no: doClaude(h) })
       if (h.resposta) blocos.push({ em: h.respondidaEm || momento(h) + 1, no: suaResposta(h) })
-      if (h.complemento) blocos.push({ em: h.complemento.em, no: seuComplemento(h) })
+      for (const x of complementosDe(h)) blocos.push({ em: x.em, no: seuComplemento(h, x) })
     }
     for (const m of cv.enviadas) blocos.push({ em: m.em, no: suaMensagem(m) })
     blocos.sort((a, b) => a.em - b.em)
@@ -842,22 +873,23 @@ async function telaConversa(cfg, chave, foco) {
             const ult = respostas[respostas.length - 1]
             ult.texto = [ult.texto, texto].filter(Boolean).join(' — ')
           }
-          const imagens = await subirFotos(cfg, k, h.id, fotos, false)
+          const imagens = await subirFotos(cfg, k, h.id, fotos)
           await enviarCifrado(cfg, k, h.id, { respostas, imagens: imagens.length ? imagens : undefined })
           registrar(h.id, { resposta: { respostas, imagens }, respondidaEm: Date.now() })
           escolhas.delete(h.id)
         } else if (sessaoAberta) {
           const id = c.toHex(c.aleatorio(16))
-          const imagens = await subirFotos(cfg, k, id, fotos, false)
+          const imagens = await subirFotos(cfg, k, id, fotos)
           const corpoMsg = c.selar(k, `m:${cv.sessao}`, { v: 1, tipo: 'mensagem', sessao: cv.sessao, id, texto, imagens: imagens.length ? imagens : undefined, em: Date.now() })
           const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: corpoMsg })
           if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
           salvarEnviada({ id, sessao: cv.sessao, texto, imagens, em: Date.now() })
         } else {
           const h = ultimaResp
-          const imagens = await subirFotos(cfg, k, h.id, fotos, true)
-          await enviarCifrado(cfg, k, h.id, { complemento: true, texto, imagens: imagens.length ? imagens : undefined })
-          registrar(h.id, { complemento: { texto, imagens, em: Date.now() } })
+          const cid = c.toHex(c.aleatorio(16))
+          const imagens = await subirFotos(cfg, k, h.id, fotos, cid)
+          await enviarCifrado(cfg, k, h.id, { complemento: true, cid, texto, imagens: imagens.length ? imagens : undefined })
+          registrar(h.id, { complementos: [...(doHist(h.id)?.complementos || []), { cid, texto, imagens, em: Date.now() }] })
         }
         if (minhaVez === vez) { vez++; telaConversa(cfg, chave) }
       },
@@ -868,8 +900,8 @@ async function telaConversa(cfg, chave, foco) {
     // Como num chat: quem estava no fim continua no fim; quem rolou para cima fica onde estava.
     const y = window.scrollY
     const noFim = window.innerHeight + y >= document.documentElement.scrollHeight - 80
-    tela(voltar(),
-      el('div', { class: 'conv-cab' }, el('div', { class: 'conv-tit' }, nomeConversa(cv)), linhaSub ? el('p', { class: 'sub' }, linhaSub) : null),
+    tela(el('div', { class: 'conv-topo' }, voltar(),
+        el('div', { class: 'conv-cab' }, el('div', { class: 'conv-tit' }, nomeConversa(cv)), linhaSub ? el('p', { class: 'sub' }, linhaSub) : null)),
       blocos.flatMap((b, i) => rotuloDia(b.em) !== (i ? rotuloDia(blocos[i - 1].em) : '') ? [el('div', { class: 'dia' }, rotuloDia(b.em)), b.no] : [b.no]),
       !modo ? el('p', { class: 'sub nota' }, cv.sessao ? 'Para escrever de novo, espere a sessão mandar algo.' : 'Nada para responder aqui.') : null,
       caixa ? caixa.el : null)
