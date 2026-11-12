@@ -200,7 +200,34 @@ function salvarEnviada(m) {
   for (const sai of todas.slice(MAX_HIST)) idb.apagarDe(sai.id)
   try { localStorage.setItem(LS_ENV, JSON.stringify(todas.slice(0, MAX_HIST))) } catch { /* cheio */ }
 }
-const hora = t => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+// Limpeza única: deixa só as conversas no padrão novo (envios que trazem "conversa", do mod 0.8.2 em
+// diante). Sai o resto (mods antigos, testes) com as fotos guardadas, e as mensagens que você mandou
+// para sessões que sumiram com isso. Do servidor, o que é anterior à limpeza e sem "conversa" não volta.
+const LS_LIMPEZA = 'claude-celular-limpeza'
+let limpezaEm = 0
+function limparPadraoAntigo() {
+  try { limpezaEm = Number(localStorage.getItem(LS_LIMPEZA)) || 0 } catch { return }
+  if (limpezaEm) return
+  const hist = lerHist()
+  const fica = hist.filter(x => x.q?.conversa?.id)
+  for (const x of hist) {
+    if (fica.includes(x)) continue
+    idb.apagarDe(x.id)
+    for (const comp of x.complementos || []) idb.apagarDe(comp.cid)
+  }
+  const conversasNovas = new Set(fica.map(x => x.q.conversa.id))
+  const enviadas = lerEnviadas()
+  const enviadasFicam = enviadas.filter(m => conversasNovas.has(m.sessao))
+  for (const m of enviadas) if (!enviadasFicam.includes(m)) idb.apagarDe(m.id)
+  try {
+    localStorage.setItem(LS_HIST, JSON.stringify(fica))
+    localStorage.setItem(LS_ENV, JSON.stringify(enviadasFicam))
+    limpezaEm = Date.now()
+    localStorage.setItem(LS_LIMPEZA, String(limpezaEm))
+  } catch { /* sem espaço: tenta de novo na próxima abertura */ }
+}
+const hora =t => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
 function registrar(id, dados) {
   const h = lerHist()
@@ -572,7 +599,9 @@ async function sincronizar(cfg, k) {
     if (!id || doHist(id)?.q) continue
     const env = await corpo(m)
     const q = env && c.abrir(k, `q:${id}`, env)
-    if (q && q.id === id) registrar(id, { q, em: m.time * 1000, vistaEm: Date.now() })
+    if (!q || q.id !== id) continue
+    if (!q.conversa && m.time * 1000 < limpezaEm) continue // do padrão antigo, já limpo
+    registrar(id, { q, em: m.time * 1000, vistaEm: Date.now() })
   }
 }
 
@@ -955,6 +984,7 @@ function iniciar() {
   servidorDoLink = params.get('s')
   const idSessao = params.get('sessao')
   const cfg = lerConfig()
+  limparPadraoAntigo()
   if (!cfg || !cfg.mestra || !cfg.topico) telaPareamento(idPergunta ? 'Pareie este celular primeiro para responder.' : undefined)
   else if (idPergunta) abrirPorId(cfg, idPergunta)
   else if (idSessao) telaConversa(cfg, idSessao)
