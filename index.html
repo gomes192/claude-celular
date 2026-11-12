@@ -269,8 +269,37 @@ const idb = (() => {
     put: (k, v) => op('readwrite', s => s.put(v, k)).catch(() => undefined),
     apagarDe: id => op('readwrite', s => s.delete(IDBKeyRange.bound(`${id}:`, `${id}:￿`))).catch(() => undefined),
     limpar: () => op('readwrite', s => s.clear()).catch(() => undefined),
+    chaves: () => op('readonly', s => s.getAllKeys()).then(v => v || []).catch(() => []),
+    apagar: k => op('readwrite', s => s.delete(k)).catch(() => undefined),
   }
 })()
+
+// Faxina: o que passou de 5 dias sai do celular (histórico, mensagens enviadas e as fotos delas), e
+// também fotos que ficaram sem dono. Roda no máximo uma vez por dia, ao abrir a página.
+const GUARDA_MS = 5 * 24 * 3600 * 1000
+const LS_FAXINA = 'claude-celular-faxina'
+async function faxina() {
+  const agora = Date.now()
+  try { if (agora - (Number(localStorage.getItem(LS_FAXINA)) || 0) < 24 * 3600 * 1000) return } catch { return }
+  const ultimaAtividade = h => Math.max(momento(h), h.respondidaEm || 0, ...complementosDe(h).map(x => x.em || 0))
+  const fica = lerHist().filter(h => agora - ultimaAtividade(h) < GUARDA_MS)
+  const enviadasFicam = lerEnviadas().filter(m => agora - (m.em || 0) < GUARDA_MS)
+  try {
+    localStorage.setItem(LS_HIST, JSON.stringify(fica))
+    localStorage.setItem(LS_ENV, JSON.stringify(enviadasFicam))
+    localStorage.setItem(LS_FAXINA, String(agora))
+  } catch { return }
+  // Cada foto é guardada como "<id do item ou do complemento>:…": sai a que não tem mais item. Os donos
+  // são lidos depois da lista de fotos, porque a tela pode ter acabado de trazer itens novos do servidor.
+  const chaves = await idb.chaves()
+  const hist = lerHist()
+  const donos = new Set([
+    ...hist.map(h => h.id),
+    ...hist.flatMap(h => complementosDe(h).map(x => x.cid).filter(Boolean)),
+    ...lerEnviadas().map(m => m.id),
+  ])
+  for (const chave of chaves) if (!donos.has(String(chave).split(':')[0])) await idb.apagar(chave)
+}
 
 // ---------- rede (ntfy) ----------
 
@@ -985,6 +1014,7 @@ function iniciar() {
   const idSessao = params.get('sessao')
   const cfg = lerConfig()
   limparPadraoAntigo()
+  faxina() // a parte que mexe no histórico roda antes de desenhar; as fotos saem em segundo plano
   if (!cfg || !cfg.mestra || !cfg.topico) telaPareamento(idPergunta ? 'Pareie este celular primeiro para responder.' : undefined)
   else if (idPergunta) abrirPorId(cfg, idPergunta)
   else if (idSessao) telaConversa(cfg, idSessao)
