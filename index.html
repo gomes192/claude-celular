@@ -545,16 +545,33 @@ async function sincronizar(cfg, k) {
   }
 }
 
-/** Agrupa o histórico por sessão; sem sessão (mod antigo, teste, mensagens desligadas), cada item é uma conversa. */
+/**
+ * Uma conversa por sessão do Claude. O que veio sem sessão fica junto: os testes de pareamento numa
+ * conversa, e as mensagens de mods antigos (antes de 0.7) numa conversa por projeto.
+ */
+const chaveDe = h => h.q.conversa?.id || h.q.sessao?.id || (h.q.origem === 'teste' ? 'teste' : `antigas:${h.q.projeto || ''}`)
+const ehSessao = chave => !chave.startsWith('teste') && !chave.startsWith('antigas:')
+const nomeConversa = cv => cv.titulo
+  || (cv.chave === 'teste' ? 'Testes de pareamento' : !ehSessao(cv.chave) ? 'Mensagens antigas (sem sessão)' : cv.projeto || 'Sessão do Claude')
+/** Como na barra lateral do app: o grupo da sessão; sem grupo, a pasta do projeto. */
+const grupoConversa = cv => cv.grupo || cv.projeto || 'Outros'
+
 function conversas() {
   const mapa = new Map()
   for (const h of lerHist()) {
     if (!h.q) continue
-    const chave = h.q.sessao?.id || `q:${h.id}`
-    const cv = mapa.get(chave) || { chave, sessao: h.q.sessao?.id, projeto: h.q.projeto, pc: h.q.pc, ate: 0, itens: [] }
+    const chave = chaveDe(h)
+    const cv = mapa.get(chave) || { chave, sessao: undefined, projeto: h.q.projeto, pc: h.q.pc, ate: 0, itens: [], nomesEm: -1 }
+    if (h.q.sessao?.id) cv.sessao = h.q.sessao.id
     cv.ate = Math.max(cv.ate, h.q.sessao?.ate || 0)
     cv.projeto = cv.projeto || h.q.projeto
-    cv.pc = cv.pc || h.q.pc
+    // nome, grupo e PC: os do envio mais recente (a sessão pode ser renomeada ou mudar de grupo)
+    if (momento(h) > cv.nomesEm) {
+      cv.nomesEm = momento(h)
+      cv.pc = h.q.pc || cv.pc
+      if (h.q.conversa?.titulo) cv.titulo = h.q.conversa.titulo
+      if (h.q.conversa?.grupo) cv.grupo = h.q.conversa.grupo
+    }
     cv.itens.push(h)
     mapa.set(chave, cv)
   }
@@ -592,10 +609,10 @@ async function telaInicio(primeiraVez) {
   const cfg = lerConfig()
   const k = c.chaves(c.fromHex(cfg.mestra))
   const aviso = el('div', {})
-  const box = el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…'))
+  const box = el('div', {}, el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…')))
   tela(
     el('p', {}, el('span', { class: 'chip' }, primeiraVez ? 'Pareado agora' : 'Celular pareado')),
-    el('h2', {}, 'Conversas'), aviso, box,
+    aviso, box,
     el('h2', {}, 'Configuração'),
     el('div', { class: 'card' }, blocoConfigurar(cfg, primeiraVez || lerHist().length === 0)),
     el('button', { class: 'btn txt', onclick: async () => {
@@ -607,8 +624,16 @@ async function telaInicio(primeiraVez) {
     const cs = conversas().map(cv => {
       const pend = cv.itens.filter(h => pendente(h, st))
       return { ...cv, alvo: pend[pend.length - 1], novo: cv.itens.some(h => h.q.origem === 'status' && !h.lidaEm) }
-    }).sort((a, b) => (!!b.alvo - !!a.alvo) || (b.ultima - a.ultima)).slice(0, 20)
-    box.replaceChildren(...(cs.length ? cs.map(linhaConversa) : [el('p', { class: 'sub' }, 'Nada ainda. O que o Claude mandar para o celular aparece aqui.')]))
+    }).sort((a, b) => (!!b.alvo - !!a.alvo) || (b.ultima - a.ultima)).slice(0, 30)
+    if (!cs.length) return box.replaceChildren(el('h2', {}, 'Conversas'), el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Nada ainda. O que o Claude mandar para o celular aparece aqui.')))
+    // Agrupadas como na barra lateral do app; o grupo com pergunta esperando (ou mais recente) vem primeiro.
+    const grupos = new Map()
+    for (const cv of cs) {
+      const g = grupoConversa(cv)
+      if (!grupos.has(g)) grupos.set(g, [])
+      grupos.get(g).push(cv)
+    }
+    box.replaceChildren(...[...grupos].flatMap(([nome, lista]) => [el('h2', {}, nome), el('div', { class: 'lista' }, ...lista.map(linhaConversa))]))
   }
   desenhar(new Map()) // na hora, só com o histórico deste celular
   atualizar = async () => {
@@ -632,10 +657,10 @@ function linhaConversa(cv) {
   const ult = cv.itens[cv.itens.length - 1]
   const eu = cv.enviadas[cv.enviadas.length - 1]
   const texto = cv.alvo ? `Pergunta: ${resumoDe(cv.alvo)}` : eu && eu.em > momento(ult) ? `Você: ${eu.texto || '📷 foto'}` : resumoDe(ult)
-  const destino = cv.sessao ? `sessao=${encodeURIComponent(cv.sessao)}` : `id=${encodeURIComponent(ult.id)}`
+  const destino = ehSessao(cv.chave) ? `sessao=${encodeURIComponent(cv.chave)}` : `id=${encodeURIComponent(ult.id)}`
   return el('button', { class: cv.alvo ? 'item pend' : cv.novo ? 'item novo' : 'item', onclick: () => { location.hash = destino } },
     el('span', { class: 'item-txt' },
-      el('span', { class: 'item-tit' }, cv.projeto || 'Claude'),
+      el('span', { class: 'item-tit' }, nomeConversa(cv)),
       el('span', { class: 'item-res' }, texto),
       el('span', { class: 'sub' }, [cv.pc, cv.alvo ? 'esperando você' : null, quando(cv.ultima)].filter(Boolean).join(' · '))),
     el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
@@ -665,7 +690,7 @@ async function abrirPorId(cfg, id) {
     return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Mensagem não encontrada ou não pôde ser aberta.'),
       el('p', { class: 'sub' }, 'O servidor guarda só 12 h, ou este celular foi pareado com outro código.')))
   }
-  return telaConversa(cfg, q.sessao?.id || `q:${id}`, id)
+  return telaConversa(cfg, chaveDe({ id, q }), id)
 }
 
 async function telaConversa(cfg, chave, foco) {
@@ -838,13 +863,13 @@ async function telaConversa(cfg, chave, foco) {
       },
     }) : null
 
-    const linhaSub = [cv.pc ? `PC: ${cv.pc}` : null,
+    const linhaSub = [grupoConversa(cv), cv.pc ? `PC: ${cv.pc}` : null,
       cv.sessao ? (sessaoAberta ? `recebe mensagens até ${hora(cv.ate)}` : 'não recebe mais mensagens (12 h sem contato)') : null].filter(Boolean).join(' · ')
     // Como num chat: quem estava no fim continua no fim; quem rolou para cima fica onde estava.
     const y = window.scrollY
     const noFim = window.innerHeight + y >= document.documentElement.scrollHeight - 80
     tela(voltar(),
-      el('div', { class: 'conv-cab' }, el('div', { class: 'conv-tit' }, cv.projeto || 'Claude'), linhaSub ? el('p', { class: 'sub' }, linhaSub) : null),
+      el('div', { class: 'conv-cab' }, el('div', { class: 'conv-tit' }, nomeConversa(cv)), linhaSub ? el('p', { class: 'sub' }, linhaSub) : null),
       blocos.flatMap((b, i) => rotuloDia(b.em) !== (i ? rotuloDia(blocos[i - 1].em) : '') ? [el('div', { class: 'dia' }, rotuloDia(b.em)), b.no] : [b.no]),
       !modo ? el('p', { class: 'sub nota' }, cv.sessao ? 'Para escrever de novo, espere a sessão mandar algo.' : 'Nada para responder aqui.') : null,
       caixa ? caixa.el : null)
