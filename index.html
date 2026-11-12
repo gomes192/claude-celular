@@ -66,12 +66,30 @@
   .item + .item { border-top:1px solid var(--brd); }
   .item.pend::before { content:""; flex:none; width:8px; height:8px; border-radius:50%; background:var(--acc); }
   .item.novo::before { content:""; flex:none; width:8px; height:8px; border-radius:50%; background:var(--sub); opacity:.6; }
-  .card.eu { margin-left:12%; border-color:var(--acc); }
-  .card.eu .sub { margin:6px 0 0; }
   .q-text.longo { font-size:16px; font-weight:400; line-height:1.5; white-space:pre-wrap; }
   .item-txt { flex:1; min-width:0; }
   .item-tit { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-weight:500; }
   .item-txt .sub { display:block; margin-top:2px; }
+  .item-res { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; margin-top:2px; }
+  /* conversa */
+  .conv-cab { margin:0 4px 14px; }
+  .conv-tit { font:500 20px/1.25 ui-serif,"New York",Georgia,serif; }
+  .conv-cab .sub { margin:2px 0 0; }
+  .msg { max-width:88%; background:var(--card); border:1px solid var(--brd); border-radius:20px 20px 20px 6px; padding:12px 14px; margin:0 0 8px; box-shadow:var(--sombra); }
+  .msg > :last-child { margin-bottom:0; }
+  .msg.eu { max-width:82%; margin-left:auto; background:var(--sel); border-color:transparent; border-radius:20px 20px 6px 20px; box-shadow:none; }
+  .msg.eu > p { margin:0 0 4px; }
+  .msg.eu .entrega { text-align:right; font-size:12px; margin:2px 0 0; }
+  .msg.alvo { border-color:var(--acc); box-shadow:0 0 0 3px var(--sel); }
+  .dia { text-align:center; font-size:12px; font-weight:600; color:var(--sub); margin:16px 0 10px; }
+  .msg-meta { font-size:12px; font-weight:600; color:var(--sub); margin-bottom:6px; }
+  .msg-p + .msg-p { border-top:1px solid var(--brd); margin-top:14px; padding-top:14px; }
+  .msg-p .q-text { margin-bottom:8px; }
+  .pede { color:var(--acc-ink); font-weight:600; font-size:14px; margin:10px 0 0; }
+  .nota { margin:4px 4px 0; font-size:13px; }
+  .fig { margin:8px 0 10px; }
+  .fig img { width:100%; height:auto; border-radius:12px; display:block; }
+  .fig .sub { margin:6px 0 0; font-size:13px; }
   .item-seta { color:var(--sub); font-size:22px; line-height:1; }
   /* configurar avisos */
   details > summary { list-style:none; display:flex; align-items:center; justify-content:space-between; min-height:44px; cursor:pointer; font-weight:600; }
@@ -86,7 +104,6 @@
   .codigo { text-align:center; font:600 20px/1.2 ui-monospace,Menlo,monospace; letter-spacing:.08em; text-transform:uppercase; padding:14px 12px; background:var(--bg); margin-bottom:10px; }
   label.q-text { display:block; }
   /* imagens */
-  .card > a > img { width:100%; height:auto; border-radius:14px; display:block; }
   dialog.zoom { border:0; padding:0; background:transparent; max-width:100vw; max-height:100dvh; }
   dialog.zoom::backdrop { background:rgba(0,0,0,.88); }
   dialog.zoom img { display:block; max-width:100vw; max-height:100dvh; object-fit:contain; }
@@ -145,7 +162,7 @@ const tela = (...kids) => {
   app.replaceChildren(el('h1', {}, 'Claudinho'), ...kids.flat().filter(k => k !== null && k !== undefined && k !== false))
   window.scrollTo(0, 0)
 }
-const voltar = () => el('a', { class: 'voltar', href: '#' }, '← Caixa de entrada')
+const voltar = () => el('a', { class: 'voltar', href: '#' }, '← Conversas')
 const quando = t => {
   const min = Math.round((Date.now() - t) / 60000)
   if (min < 1) return 'agora'
@@ -177,33 +194,6 @@ function salvarEnviada(m) {
 }
 const hora = t => new Date(t).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 
-/** Sessões que mandaram algo para este celular, pelo histórico (o id só vem dentro do envelope cifrado). */
-function sessoesConhecidas() {
-  const mapa = new Map()
-  for (const h of lerHist()) {
-    const s = h.q?.sessao
-    if (!s?.id) continue
-    const em = h.vistaEm || h.respondidaEm || 0
-    const a = mapa.get(s.id) || { id: s.id, projeto: h.q.projeto, pc: h.q.pc, ate: 0, ultima: 0, itens: [] }
-    a.ate = Math.max(a.ate, s.ate || 0)
-    a.ultima = Math.max(a.ultima, em)
-    a.projeto = a.projeto || h.q.projeto
-    a.pc = a.pc || h.q.pc
-    a.itens.push(h)
-    mapa.set(s.id, a)
-  }
-  for (const m of lerEnviadas()) { const a = mapa.get(m.sessao); if (a) a.ultima = Math.max(a.ultima, m.em) }
-  return [...mapa.values()].sort((a, b) => b.ultima - a.ultima)
-}
-const linkSessao = q => q?.sessao?.id && q.sessao.ate > Date.now()
-  ? el('p', {}, el('a', { class: 'btn txt', href: `#sessao=${encodeURIComponent(q.sessao.id)}` }, 'Mandar mensagem para esta sessão'))
-  : null
-// "PC: Notebook · Projeto: X" (o PC só aparece quando a pergunta veio de um mod que manda o nome)
-function deOnde(q) {
-  const partes = [q.pc ? `PC: ${q.pc}` : null, q.projeto ? `Projeto: ${q.projeto}` : null].filter(Boolean)
-  return partes.length ? el('p', { class: 'sub' }, partes.join(' · ')) : null
-}
-
 function registrar(id, dados) {
   const h = lerHist()
   const i = h.findIndex(x => x.id === id)
@@ -212,6 +202,13 @@ function registrar(id, dados) {
   h.unshift(novo)
   salvarHist(h)
   return novo
+}
+/** Muda itens do histórico sem trazê-los para o topo (ex.: marcar atualizações como lidas). */
+function anotar(ids, dados) {
+  const h = lerHist()
+  let mudou = false
+  for (const x of h) if (ids.includes(x.id)) { Object.assign(x, dados); mudou = true }
+  if (mudou) salvarHist(h)
 }
 
 // Imagens guardadas no celular (IndexedDB): continuam visíveis depois que o servidor apaga (3 h).
@@ -266,10 +263,6 @@ async function corpo(m) {
   }
   return m.message
 }
-async function buscar(cfg, sufixo, titulo) {
-  const m = [...(await mensagens(cfg, sufixo))].reverse().find(x => x.title === titulo)
-  return m ? corpo(m) : undefined
-}
 /** Anexo como bytes (o PC manda as imagens em binário: menor e sem base64). */
 async function buscarBytes(cfg, sufixo, titulo) {
   const m = [...(await mensagens(cfg, sufixo))].reverse().find(x => x.title === titulo)
@@ -297,12 +290,12 @@ async function statusTodos(cfg, k) {
 }
 
 async function carregarPergunta(cfg, k, id) {
-  const local = doHist(id)
-  if (local?.q) return local.q
-  const env = await buscar(cfg, '-q', id)
+  const m = [...(await mensagens(cfg, '-q'))].reverse().find(x => x.title === id)
+  const env = m && (await corpo(m))
   const q = env && c.abrir(k, `q:${id}`, env)
-  if (q && q.id === id) { registrar(id, { q, vistaEm: Date.now() }); return q }
-  return undefined
+  if (!q || q.id !== id) return undefined
+  registrar(id, { q, em: m.time * 1000, vistaEm: Date.now() })
+  return q
 }
 
 async function imagem(cfg, k, chaveCache, sufixo, titulo, contexto, mime) {
@@ -324,21 +317,18 @@ function ampliar(url, alt) {
   d.showModal()
 }
 
-function cardImagem(promessa, nome) {
-  const caixa = el('div', { class: 'card' }, el('p', { class: 'sub' }, `Carregando ${nome || 'imagem'}…`))
+function figura(promessa, nome) {
+  const caixa = el('div', { class: 'fig' }, el('p', { class: 'sub' }, `Carregando ${nome || 'imagem'}…`))
   promessa.then(blob => {
     if (!blob) throw new Error('sem imagem')
     const url = URL.createObjectURL(blob)
     caixa.replaceChildren(
       el('a', { href: url, onclick: e => { e.preventDefault(); ampliar(url, nome || 'imagem') } }, el('img', { src: url, alt: nome || 'imagem' })),
-      el('p', { class: 'sub', style: 'margin-top:10px' }, `${nome || 'imagem'} · toque para ampliar`),
+      el('p', { class: 'sub' }, `${nome || 'imagem'} · toque para ampliar`),
     )
   }).catch(() => caixa.replaceChildren(el('p', { class: 'err' }, `Não consegui abrir ${nome || 'a imagem'} (imagens ficam 3 h no servidor).`)))
   return caixa
 }
-
-const imagensDaPergunta = (cfg, k, id, q) => (q.imagens || []).map(img =>
-  cardImagem(imagem(cfg, k, `${id}:q:${img.n}`, '-a', `${id}:${img.n}`, `i:${id}:${img.n}`, img.mime), img.nome))
 
 // ---------- fotos ----------
 
@@ -452,13 +442,15 @@ function caixaMensagem({ placeholder, rotulo, podeEnviar = () => false, aoEnviar
   return {
     el: el('div', { class: 'cmp-dock' }, el('div', { class: 'cmp' }, grade, txt, entrada, el('div', { class: 'cmp-barra' }, mais, dica, enviar)), status),
     atualizar,
+    temRascunho: () => !!txt.value.trim() || fotos.length > 0,
+    trocar: t => { txt.placeholder = t; txt.setAttribute('aria-label', t) },
   }
 }
 
 // ---------- pareamento ----------
 
 function telaPareamento(msg) {
-  const status = el('p', { class: 'sub', id: 'codigo-st', role: 'status' }, msg || 'Digite o código que aparece no painel "Celular" do Claude Code (comando /celular parear).')
+  const status = el('p', { class: 'sub', id: 'codigo-st', role: 'status' }, msg || 'Digite o código que aparece no painel "Claudinho Mobile" do Claude Code (comando /claudinho parear).')
   const btn = el('button', { class: 'btn' }, 'Parear')
   const input = el('input', { id: 'codigo', class: 'codigo', type: 'text', placeholder: 'XXXX-XXXX-XXXX', autocomplete: 'off', autocapitalize: 'characters',
     autocorrect: 'off', spellcheck: 'false', enterkeyhint: 'go', 'aria-describedby': 'codigo-st', onkeydown: e => { if (e.key === 'Enter') btn.click() } })
@@ -477,7 +469,7 @@ function telaPareamento(msg) {
       return
     }
     // Veio de um aviso? Vai direto para a pergunta.
-    if (idPergunta) telaPergunta(lerConfig(), idPergunta); else telaInicio(true)
+    if (idPergunta) abrirPorId(lerConfig(), idPergunta); else telaInicio(true)
   }
   tela(el('div', { class: 'card' }, el('label', { class: 'q-text', for: 'codigo' }, 'Código de pareamento'), input, status, btn))
 }
@@ -527,307 +519,357 @@ function blocoConfigurar(cfg, aberto) {
       ANDROID ? el('a', { class: 'btn sec', href: linkNtfy(cfg) }, 'Abrir direto no app') : null),
     passo(4, 'Teste o aviso',
       el('button', { class: 'btn', onclick: e => testarAviso(cfg, statusTeste, e.currentTarget) }, 'Testar aviso'), statusTeste),
-    el('p', { class: 'sub', style: 'margin:4px 0 0' }, 'Dica: guarde esta página nos favoritos do mesmo navegador que abre os links. Tocar no aviso (ou no botão "Responder") abre a pergunta aqui.'),
+    el('p', { class: 'sub', style: 'margin:4px 0 0' }, 'Dica: guarde esta página nos favoritos do mesmo navegador que abre os links. Tocar no aviso abre a conversa da sessão aqui.'),
   )
 }
 
-// ---------- caixa de entrada ----------
+// ---------- conversas ----------
+// Tudo que uma sessão mandou (perguntas e atualizações) e tudo que você escreveu para ela fica
+// numa conversa só, com uma caixa de mensagem só. A caixa decide o que o envio é:
+//   pergunta esperando → resposta a ela; sessão aberta → mensagem; sem sessão → complemento.
 
-let atualizarInicio
+const momento = h => h.em || h.vistaEm || h.respondidaEm || 0
+/** Pergunta ainda esperando resposta (atualização de status nunca espera). */
+const pendente = (h, st) => h.q.origem !== 'status' && !h.resposta && !st.get(h.id)?.estado && !(h.q.exp && Date.now() > h.q.exp)
+const resumoDe = h => { const p = h.q?.perguntas?.[0]; return (p?.texto || p?.titulo || '').replace(/\s+/g, ' ') }
+const ESTADOS_RESPONDIDA = ['respondida', 'respondida-no-pc']
+
+/** Traz o que o PC mandou nas últimas 12 h (perguntas e atualizações) para o histórico deste celular. */
+async function sincronizar(cfg, k) {
+  for (const m of await mensagens(cfg, '-q')) {
+    const id = m.title
+    if (!id || doHist(id)?.q) continue
+    const env = await corpo(m)
+    const q = env && c.abrir(k, `q:${id}`, env)
+    if (q && q.id === id) registrar(id, { q, em: m.time * 1000, vistaEm: Date.now() })
+  }
+}
+
+/** Agrupa o histórico por sessão; sem sessão (mod antigo, teste, mensagens desligadas), cada item é uma conversa. */
+function conversas() {
+  const mapa = new Map()
+  for (const h of lerHist()) {
+    if (!h.q) continue
+    const chave = h.q.sessao?.id || `q:${h.id}`
+    const cv = mapa.get(chave) || { chave, sessao: h.q.sessao?.id, projeto: h.q.projeto, pc: h.q.pc, ate: 0, itens: [] }
+    cv.ate = Math.max(cv.ate, h.q.sessao?.ate || 0)
+    cv.projeto = cv.projeto || h.q.projeto
+    cv.pc = cv.pc || h.q.pc
+    cv.itens.push(h)
+    mapa.set(chave, cv)
+  }
+  const enviadas = lerEnviadas()
+  for (const cv of mapa.values()) {
+    cv.itens.sort((a, b) => momento(a) - momento(b))
+    cv.enviadas = cv.sessao ? enviadas.filter(m => m.sessao === cv.sessao).sort((a, b) => a.em - b.em) : []
+    cv.ultima = Math.max(0, ...cv.itens.map(h => Math.max(momento(h), h.respondidaEm || 0, h.complemento?.em || 0)), ...cv.enviadas.map(m => m.em))
+  }
+  return [...mapa.values()]
+}
+
+/** "✓ Entregue", "Enviando…" ou o aviso de que não chegou (o PC confirma pelo tópico de status). */
+function entrega(ok, em) {
+  if (ok) return el('p', { class: 'ok entrega' }, `${hora(em)} · ✓ Entregue`)
+  const idade = Date.now() - em
+  if (idade > 12 * 3600 * 1000) return el('p', { class: 'sub entrega' }, hora(em)) // o status já saiu do servidor
+  if (idade > 90_000) return el('p', { class: 'err entrega' }, `${hora(em)} · Ainda não entregue: a sessão pode estar fechada ou o PC desligado.`)
+  return el('p', { class: 'sub entrega' }, `${hora(em)} · Enviando…`)
+}
+/** "Hoje", "Ontem" ou a data: separa os dias na conversa. */
+function rotuloDia(t) {
+  const d = new Date(t), hoje = new Date()
+  const ontem = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() - 1)
+  if (d.toDateString() === hoje.toDateString()) return 'Hoje'
+  if (d.toDateString() === ontem.toDateString()) return 'Ontem'
+  return d.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })
+}
+
+// ---------- lista de conversas ----------
+
+let atualizar
 async function telaInicio(primeiraVez) {
   const minha = vez
   const cfg = lerConfig()
   const k = c.chaves(c.fromHex(cfg.mestra))
-  const pendentesBox = el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…'))
-  const respondidasBox = el('div', { class: 'lista' })
-  const atualizacoesSec = el('div', {})
-  const sessoesSec = el('div', {})
+  const aviso = el('div', {})
+  const box = el('div', { class: 'lista' }, el('p', { class: 'sub' }, 'Buscando…'))
   tela(
     el('p', {}, el('span', { class: 'chip' }, primeiraVez ? 'Pareado agora' : 'Celular pareado')),
-    el('h2', {}, 'Esperando você'), pendentesBox,
-    atualizacoesSec,
-    sessoesSec,
-    el('h2', {}, 'Respondidas'), respondidasBox,
+    el('h2', {}, 'Conversas'), aviso, box,
     el('h2', {}, 'Configuração'),
     el('div', { class: 'card' }, blocoConfigurar(cfg, primeiraVez || lerHist().length === 0)),
     el('button', { class: 'btn txt', onclick: async () => {
-      if (!confirm('Desparear este celular? O histórico de respostas e as fotos guardadas neste aparelho serão apagados.')) return
+      if (!confirm('Desparear este celular? O histórico das conversas e as fotos guardadas neste aparelho serão apagados.')) return
       localStorage.removeItem(LS); localStorage.removeItem(LS_HIST); localStorage.removeItem(LS_ENV); await idb.limpar(); telaPareamento()
     } }, 'Desparear este celular'),
   )
-  const item = (h, pendente, novo) => {
-    const p0 = h.q?.perguntas?.[0]
-    return el('button', { class: pendente ? 'item pend' : novo ? 'item novo' : 'item', onclick: () => { location.hash = `id=${h.id}` } },
-      el('span', { class: 'item-txt' },
-        el('span', { class: 'item-tit' }, p0?.titulo || p0?.texto || 'Pergunta'),
-        el('span', { class: 'sub' }, [h.q?.pc, h.q?.projeto, (h.q?.imagens || []).length ? `${h.q.imagens.length} imagem(ns)` : null, quando(h.em || h.vistaEm || Date.now())].filter(Boolean).join(' · '))),
-      el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
+  const desenhar = st => {
+    const cs = conversas().map(cv => {
+      const pend = cv.itens.filter(h => pendente(h, st))
+      return { ...cv, alvo: pend[pend.length - 1], novo: cv.itens.some(h => h.q.origem === 'status' && !h.lidaEm) }
+    }).sort((a, b) => (!!b.alvo - !!a.alvo) || (b.ultima - a.ultima)).slice(0, 20)
+    box.replaceChildren(...(cs.length ? cs.map(linhaConversa) : [el('p', { class: 'sub' }, 'Nada ainda. O que o Claude mandar para o celular aparece aqui.')]))
   }
-  const desenharRespondidas = st => {
-    const resp = lerHist().filter(h => h.resposta || st.has(h.id)).slice(0, 20)
-    respondidasBox.replaceChildren(...(resp.length ? resp.map(h => item({ ...h, em: h.respondidaEm || h.vistaEm }, false)) : [el('p', { class: 'sub' }, 'Nada respondido ainda.')]))
-  }
-  desenharRespondidas(new Map()) // na hora, só com o histórico deste celular
-  // Sessões que ainda aceitam mensagem (12 h desde o último contato): toque para escrever para ela.
-  const desenharSessoes = () => {
-    const ss = sessoesConhecidas().filter(x => x.ate > Date.now()).slice(0, 8)
-    sessoesSec.replaceChildren(...(ss.length
-      ? [el('h2', {}, 'Sessões'), el('div', { class: 'lista' }, ...ss.map(x => el('button', { class: 'item', onclick: () => { location.hash = `sessao=${encodeURIComponent(x.id)}` } },
-          el('span', { class: 'item-txt' },
-            el('span', { class: 'item-tit' }, x.projeto || 'Sessão do Claude'),
-            el('span', { class: 'sub' }, [x.pc, `último contato ${quando(x.ultima)}`].filter(Boolean).join(' · '))),
-          el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))))]
-      : []))
-  }
-  desenharSessoes()
-
-  atualizarInicio = async () => {
+  desenhar(new Map()) // na hora, só com o histórico deste celular
+  atualizar = async () => {
     if (minha !== vez) return
-    const st = await statusTodos(cfg, k)
-    let pend = []
-    let atuais = []
+    let st
     try {
-      for (const m of await mensagens(cfg, '-q')) {
-        const id = m.title
-        if (!id) continue
-        const local = doHist(id)
-        if (local?.resposta) continue
-        let q = local?.q
-        if (!q) {
-          const env = await corpo(m)
-          q = env && c.abrir(k, `q:${id}`, env)
-          if (!q || q.id !== id) continue
-          registrar(id, { q, vistaEm: m.time * 1000 })
-        }
-        if (st.has(id)) continue // respondida no PC (ou por outro aparelho): vai para "Respondidas"
-        // Atualização de status: só para ler, não entra em "Esperando você".
-        if (q.origem === 'status') { atuais.push({ id, q, em: m.time * 1000, novo: !doHist(id)?.lidaEm }); continue }
-        if (q.exp && Date.now() > q.exp) continue
-        pend.push({ id, q, em: m.time * 1000 })
-      }
+      await sincronizar(cfg, k)
+      st = await statusTodos(cfg, k)
     } catch (e) {
-      if (minha !== vez) return
-      desenharRespondidas(st)
-      pendentesBox.replaceChildren(el('p', { class: 'err' }, `Sem conexão com o servidor de avisos: ${e.message || e}`),
-        el('p', {}, el('button', { class: 'btn sec', onclick: () => atualizarInicio() }, 'Tentar de novo')))
+      if (minha === vez) aviso.replaceChildren(el('div', { class: 'faixa' }, `Sem conexão com o servidor de avisos: ${e.message || e}`))
       return
     }
     if (minha !== vez) return
-    pend = pend.sort((a, b) => b.em - a.em)
-    atuais = atuais.sort((a, b) => b.em - a.em).slice(0, 15)
-    atualizacoesSec.replaceChildren(...(atuais.length
-      ? [el('h2', {}, 'Atualizações'), el('div', { class: 'lista' }, ...atuais.map(h => item(h, false, h.novo)))]
-      : []))
-    pendentesBox.replaceChildren(...(pend.length ? pend.map(h => item(h, true)) : [el('p', { class: 'sub' }, 'Nenhuma pergunta esperando. 🎉')]))
-    desenharRespondidas(st)
-    desenharSessoes()
+    aviso.replaceChildren()
+    desenhar(st)
   }
-  await atualizarInicio()
+  await atualizar()
 }
-// Com a caixa de entrada à vista, atualiza a cada 20 s e ao voltar para a página.
-const tentarAtualizar = () => { if (!idPergunta && atualizarInicio && document.visibilityState === 'visible' && lerConfig()) atualizarInicio() }
+
+function linhaConversa(cv) {
+  const ult = cv.itens[cv.itens.length - 1]
+  const eu = cv.enviadas[cv.enviadas.length - 1]
+  const texto = cv.alvo ? `Pergunta: ${resumoDe(cv.alvo)}` : eu && eu.em > momento(ult) ? `Você: ${eu.texto || '📷 foto'}` : resumoDe(ult)
+  const destino = cv.sessao ? `sessao=${encodeURIComponent(cv.sessao)}` : `id=${encodeURIComponent(ult.id)}`
+  return el('button', { class: cv.alvo ? 'item pend' : cv.novo ? 'item novo' : 'item', onclick: () => { location.hash = destino } },
+    el('span', { class: 'item-txt' },
+      el('span', { class: 'item-tit' }, cv.projeto || 'Claude'),
+      el('span', { class: 'item-res' }, texto),
+      el('span', { class: 'sub' }, [cv.pc, cv.alvo ? 'esperando você' : null, quando(cv.ultima)].filter(Boolean).join(' · '))),
+    el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
+}
+// Com a página à vista, atualiza a cada 20 s e ao voltar para ela.
+const tentarAtualizar = () => { if (atualizar && document.visibilityState === 'visible' && lerConfig()) atualizar() }
 setInterval(tentarAtualizar, 20000)
 document.addEventListener('visibilitychange', tentarAtualizar)
 
-// ---------- pergunta ----------
+// ---------- uma conversa ----------
 
-async function telaPergunta(cfg, id, faixa) {
+/** O aviso abre "#id=...": acha a conversa a que o item pertence e rola até ele. */
+async function abrirPorId(cfg, id) {
   const minha = vez
-  tela(el('p', { class: 'sub' }, 'Buscando a pergunta…'))
-  const k = c.chaves(c.fromHex(cfg.mestra))
-  let q, st
-  try {
-    ;[q, st] = await Promise.all([carregarPergunta(cfg, k, id), statusTodos(cfg, k)])
-  } catch (e) {
-    if (minha !== vez) return
-    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Não consegui falar com o servidor de avisos.'), el('p', { class: 'sub' }, String(e.message || e))))
-  }
-  if (minha !== vez) return
+  let q = doHist(id)?.q
   if (!q) {
-    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Pergunta não encontrada ou não pôde ser aberta.'), el('p', { class: 'sub' }, 'Ela pode ter expirado, ou este celular foi pareado com outro código.')))
+    tela(el('p', { class: 'sub' }, 'Buscando…'))
+    try {
+      q = await carregarPergunta(cfg, c.chaves(c.fromHex(cfg.mestra)), id)
+    } catch (e) {
+      if (minha !== vez) return
+      return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Não consegui falar com o servidor de avisos.'), el('p', { class: 'sub' }, String(e.message || e))))
+    }
+    if (minha !== vez) return
   }
-  const local = doHist(id)
-  const s = st.get(id)
-  if (local?.resposta || s?.estado) return telaRespondida(cfg, k, id, q, s, local, faixa)
-  if (q.origem === 'status') registrar(id, { lidaEm: Date.now() })
-  if (q.origem === 'status' && q.exp && Date.now() > q.exp) {
-    return tela(voltar(), el('p', { class: 'sub' }, 'Atualização do Claude'), deOnde(q), ...imagensDaPergunta(cfg, k, id, q),
-      ...q.perguntas.map(p => el('div', { class: 'card' }, el('div', { class: 'q-text longo' }, p.texto))),
-      el('p', { class: 'sub' }, 'Já não dá para responder por aqui (passou de 12 h).'))
+  if (!q) {
+    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Mensagem não encontrada ou não pôde ser aberta.'),
+      el('p', { class: 'sub' }, 'O servidor guarda só 12 h, ou este celular foi pareado com outro código.')))
   }
-  if (q.exp && Date.now() > q.exp) {
-    return tela(voltar(), el('div', { class: 'faixa' }, 'Esta pergunta expirou sem resposta.'), ...imagensDaPergunta(cfg, k, id, q),
-      ...q.perguntas.map(p => el('div', { class: 'card' }, p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null, el('div', { class: 'q-text' }, p.texto))))
-  }
-  return telaFormulario(cfg, k, id, q)
+  return telaConversa(cfg, q.sessao?.id || `q:${id}`, id)
 }
 
-function telaFormulario(cfg, k, id, q) {
-  const ehStatus = q.origem === 'status'
-  const soMensagem = ehStatus || (q.origem === 'mensagem' && q.perguntas.every(p => !(p.opcoes || []).length))
-  const estado = q.perguntas.map(() => ({ escolhas: new Set(), texto: '' }))
-  const cards = q.perguntas.map((p, i) => {
-    const botoes = (p.opcoes || []).map(o => {
-      const b = el('button', { class: p.multipla ? 'opt multi' : 'opt', 'aria-pressed': 'false', onclick: () => {
-        const sel = estado[i].escolhas
-        if (p.multipla) { sel.has(o.rotulo) ? sel.delete(o.rotulo) : sel.add(o.rotulo) } else { const tinha = sel.has(o.rotulo); sel.clear(); if (!tinha) sel.add(o.rotulo) }
-        for (const x of botoes) x.setAttribute('aria-pressed', String(sel.has(x.dataset.rotulo)))
-      } }, o.rotulo, o.descricao ? el('small', {}, o.descricao) : null)
-      b.dataset.rotulo = o.rotulo
-      return b
-    })
-    // Várias perguntas: cada uma tem seu campo de texto. Uma só: o texto vai na caixa de baixo.
-    const txt = q.perguntas.length > 1 && p.livre !== false
-      ? el('textarea', { placeholder: 'Outra resposta (opcional)', maxlength: '2000', 'aria-label': `Outra resposta para: ${p.texto}`, oninput: e => { estado[i].texto = e.target.value } })
-      : null
-    return el('div', { class: 'card' },
-      p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
-      el('div', { class: ehStatus ? 'q-text longo' : 'q-text' }, p.texto),
-      p.multipla ? el('p', { class: 'sub' }, 'Pode marcar mais de uma.') : null,
-      botoes, txt)
-  })
-  const temOpcoes = q.perguntas.some(p => (p.opcoes || []).length)
-  const caixa = caixaMensagem({
-    placeholder: q.perguntas.length > 1 ? 'Comentário geral ou foto (opcional)' : soMensagem ? 'Responder (opcional)' : temOpcoes ? 'Escreva algo ou anexe foto (opcional)' : 'Sua resposta',
-    rotulo: 'Enviar resposta',
-    podeEnviar: () => estado.some(x => x.escolhas.size > 0 || x.texto.trim()),
-    aoEnviar: async ({ texto, fotos }) => {
-      const minha = vez
-      const respostas = estado.map(x => ({ escolhas: [...x.escolhas], texto: x.texto.trim() }))
-      if (texto) {
-        const ult = respostas[respostas.length - 1]
-        ult.texto = [ult.texto, texto].filter(Boolean).join(' — ')
-      }
-      const imagens = await subirFotos(cfg, k, id, fotos, false)
-      await enviarCifrado(cfg, k, id, { respostas, imagens: imagens.length ? imagens : undefined })
-      registrar(id, { q, resposta: { respostas, imagens }, respondidaEm: Date.now() })
-      if (minha === vez) telaRespondida(cfg, k, id, q, undefined, doHist(id), 'Resposta enviada ✓ O Claude recebe em alguns segundos.')
-    },
-  })
-  // escolher uma opção já libera a seta de enviar
-  for (const card of cards) card.addEventListener('click', () => caixa.atualizar())
-  tela(voltar(), ehStatus ? el('p', { class: 'sub' }, 'Atualização do Claude') : null, deOnde(q), linkSessao(q), ...imagensDaPergunta(cfg, k, id, q), ...cards,
-    soMensagem ? el('p', { class: 'sub' }, ehStatus ? 'Só para você saber: não precisa responder. Se quiser, escreva abaixo.' : 'Não precisa responder.') : null, caixa.el)
-}
-
-/** Já respondida: só leitura (pergunta, imagens, sua resposta, suas fotos) e um único complemento. */
-function telaRespondida(cfg, k, id, q, s, local, faixa) {
-  const resp = local?.resposta
-  const cancelada = !resp && s?.estado === 'cancelada'
-  const ondeResp = resp ? 'Respondida aqui no celular' : s?.estado === 'respondida-no-pc' ? 'Respondida no PC' : cancelada ? 'Encerrada no PC (sem resposta)' : 'Respondida no celular'
-  const quandoResp = local?.respondidaEm || s?.em
-  const cards = q.perguntas.map((p, i) => {
-    const r = resp?.respostas?.[i]
-    const escolhidas = new Set(r?.escolhas || [])
-    return el('div', { class: 'card' },
-      p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
-      el('div', { class: q.origem === 'status' ? 'q-text longo' : 'q-text' }, p.texto),
-      ...(p.opcoes || []).map(o => el('button', { class: p.multipla ? 'opt multi' : 'opt', disabled: true, 'aria-pressed': String(escolhidas.has(o.rotulo)) }, o.rotulo)),
-      r?.texto ? el('p', { class: 'resp', style: 'margin-top:10px' }, `Você escreveu: ${r.texto}`) : null)
-  })
-  const minhasFotos = (resp?.imagens || []).map(img => cardImagem(idb.get(`${id}:r:${img.n}`), `Sua foto: ${img.nome}`))
-  const resumoPc = !resp && s?.resumo ? el('div', { class: 'card' }, el('div', { class: 'q-title' }, 'Resposta'), el('p', { class: 'resp' }, s.resumo)) : null
-
-  // Complemento: um só, até 24 h depois da resposta, e não para perguntas encerradas sem resposta.
-  let blocoComp
-  let ehCaixa = false
-  const comp = local?.complemento
-  if (comp) {
-    blocoComp = el('div', { class: 'card' }, el('div', { class: 'q-title' }, 'Seu complemento'),
-      comp.texto ? el('p', { class: 'resp' }, comp.texto) : null,
-      ...(comp.imagens || []).map(img => cardImagem(idb.get(`${id}:c:${img.n}`), img.nome)))
-  } else if (s?.complemento) {
-    blocoComp = el('p', { class: 'sub' }, 'Complemento já enviado.')
-  } else if (cancelada || !quandoResp || Date.now() - quandoResp > COMPLEMENTO_MS) {
-    blocoComp = el('p', { class: 'sub' }, 'Esta pergunta não aceita mais complemento.')
-  } else {
-    ehCaixa = true
-    blocoComp = caixaMensagem({
-      placeholder: 'Acrescentar algo à resposta (só uma vez)',
-      rotulo: 'Enviar complemento',
-      aoEnviar: async ({ texto, fotos }) => {
-        const minha = vez
-        const imagens = await subirFotos(cfg, k, id, fotos, true)
-        await enviarCifrado(cfg, k, id, { complemento: true, texto, imagens: imagens.length ? imagens : undefined })
-        registrar(id, { complemento: { texto, imagens, em: Date.now() } })
-        if (minha === vez) telaRespondida(cfg, k, id, q, s, doHist(id), 'Complemento enviado ✓')
-      },
-    }).el
-  }
-
-  tela(voltar(),
-    faixa ? el('div', { class: 'faixa', role: 'status' }, faixa) : null,
-    el('p', { class: cancelada ? 'sub' : 'ok' }, `${cancelada ? '' : '✓ '}${ondeResp}${quandoResp ? ` · ${quando(quandoResp)}` : ''}`),
-    deOnde(q), linkSessao(q),
-    ...imagensDaPergunta(cfg, k, id, q), ...cards, resumoPc, ...minhasFotos,
-    ehCaixa ? null : el('h2', {}, 'Complemento'), blocoComp)
-}
-
-// ---------- sessão: escrever a qualquer hora ----------
-
-async function telaSessao(cfg, sid, faixa) {
+async function telaConversa(cfg, chave, foco) {
   const minha = vez
   const k = c.chaves(c.fromHex(cfg.mestra))
-  const s = sessoesConhecidas().find(x => x.id === sid)
-  if (!s) {
-    return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Sessão não encontrada neste celular.'),
-      el('p', { class: 'sub' }, 'Abra antes uma pergunta ou atualização que ela mandou.')))
+  // Escolhas nas perguntas abertas: sobrevivem às atualizações da tela.
+  const escolhas = new Map()
+  const doItem = h => {
+    if (!escolhas.has(h.id)) escolhas.set(h.id, h.q.perguntas.map(() => ({ sel: new Set(), texto: '' })))
+    return escolhas.get(h.id)
   }
-  const aberta = s.ate > Date.now()
-  const linhaBox = el('div', {})
-  const doClaude = h => {
-    const p0 = h.q?.perguntas?.[0]
-    const tipo = h.q?.origem === 'status' ? 'Atualização' : 'Pergunta'
-    return el('button', { class: 'item', onclick: () => { location.hash = `id=${h.id}` } },
-      el('span', { class: 'item-txt' },
-        el('span', { class: 'item-tit' }, p0?.titulo || p0?.texto || tipo),
-        el('span', { class: 'sub' }, `${tipo} do Claude · ${quando(h.vistaEm || h.respondidaEm || Date.now())}`)),
-      el('span', { class: 'item-seta', 'aria-hidden': 'true' }, '›'))
-  }
-  const minhaMsg = (m, st) => {
-    const entregue = st.get(m.id)?.estado === 'entregue'
-    const atrasada = !entregue && Date.now() - m.em > 90_000
-    return el('div', { class: 'card eu' },
-      m.texto ? el('p', { class: 'resp' }, m.texto) : null,
-      (m.imagens || []).length ? el('p', { class: 'sub' }, `📷 ${m.imagens.length} foto${m.imagens.length > 1 ? 's' : ''}`) : null,
-      el('p', { class: entregue ? 'ok' : atrasada ? 'err' : 'sub' },
-        entregue ? `✓ Entregue à sessão · ${quando(m.em)}` : atrasada ? 'Ainda não entregue: a sessão pode estar fechada ou o PC desligado.' : `Enviando… · ${quando(m.em)}`))
-  }
+  let caixa = null
+  let assinatura = ''
+  let primeira = true
+  let focoVisto = !foco
+  const rascunho = () => !!caixa?.temRascunho() || document.activeElement?.tagName === 'TEXTAREA'
+    || [...escolhas.values()].some(es => es.some(e => e.sel.size || e.texto.trim()))
+
   const desenhar = st => {
-    const tudo = [
-      ...s.itens.map(h => ({ em: h.vistaEm || h.respondidaEm || 0, no: doClaude(h) })),
-      ...lerEnviadas().filter(m => m.sessao === sid).map(m => ({ em: m.em, no: minhaMsg(m, st) })),
-    ].sort((a, b) => a.em - b.em).slice(-30)
-    linhaBox.replaceChildren(...(tudo.length ? tudo.map(x => x.no) : [el('p', { class: 'sub' }, 'Nada ainda.')]))
+    const cv = conversas().find(x => x.chave === chave)
+    if (!cv) {
+      primeira = false
+      return tela(voltar(), el('div', { class: 'card' }, el('p', { class: 'err' }, 'Conversa não encontrada neste celular.'),
+        el('p', { class: 'sub' }, 'Ela aparece aqui depois que a sessão manda uma pergunta ou atualização.')))
+    }
+    const agora = Date.now()
+    const pend = cv.itens.filter(h => pendente(h, st))
+    const sessaoAberta = !!cv.sessao && cv.ate > agora
+    // Sem sessão não há mensagem solta: dá para acrescentar uma vez à última resposta (24 h).
+    const respondidas = cv.sessao ? [] : cv.itens.filter(h => h.resposta || ESTADOS_RESPONDIDA.includes(st.get(h.id)?.estado))
+    const ultimaResp = respondidas[respondidas.length - 1]
+    const quandoResp = ultimaResp && (ultimaResp.respondidaEm || st.get(ultimaResp.id)?.em)
+    const podeComp = !!ultimaResp && !ultimaResp.complemento && !st.get(ultimaResp.id)?.complemento && agora - quandoResp < COMPLEMENTO_MS
+    const recentes = [...cv.itens.filter(h => h.resposta).map(h => h.respondidaEm), ...cv.itens.filter(h => h.complemento).map(h => h.complemento.em), ...cv.enviadas.map(m => m.em)]
+      .some(t => agora - t < 120_000)
+    const nova = JSON.stringify([
+      cv.itens.map(h => [h.id, !!h.resposta, !!h.complemento, st.get(h.id)?.estado, !!st.get(h.id)?.complemento]),
+      cv.enviadas.map(m => [m.id, st.get(m.id)?.estado]),
+      sessaoAberta, podeComp, recentes ? Math.floor(agora / 30000) : 0,
+    ])
+    if (!primeira && (nova === assinatura || rascunho())) return
+    assinatura = nova
+    const naoLidas = cv.itens.filter(h => h.q.origem === 'status' && !h.lidaEm).map(h => h.id)
+    if (naoLidas.length) anotar(naoLidas, { lidaEm: agora })
+
+    let alvo = pend.find(h => h.id === foco) || pend[pend.length - 1]
+    const cartoes = new Map()
+    const textoCaixa = () => alvo
+      ? (alvo.q.perguntas.length > 1 ? 'Comentário geral ou foto (opcional)' : (alvo.q.perguntas[0]?.opcoes || []).length ? 'Escolha acima ou escreva sua resposta' : 'Sua resposta')
+      : sessaoAberta ? 'Mensagem para esta sessão' : 'Acrescentar algo à última resposta (uma vez)'
+    const mirar = h => {
+      if (alvo?.id !== h.id) {
+        alvo = h
+        for (const [id, no] of cartoes) no.classList.toggle('alvo', id === h.id)
+        caixa?.trocar(textoCaixa())
+      }
+      caixa?.atualizar()
+    }
+
+    const imagensDe = h => (h.q.imagens || []).map(img =>
+      figura(imagem(cfg, k, `${h.id}:q:${img.n}`, '-a', `${h.id}:${img.n}`, `i:${h.id}:${img.n}`, img.mime), img.nome))
+
+    const doClaude = h => {
+      const q = h.q
+      const s = st.get(h.id)
+      const r = h.resposta
+      const ehStatus = q.origem === 'status'
+      const aberta = pend.includes(h)
+      const es = aberta ? doItem(h) : null
+      const partes = q.perguntas.map((p, i) => {
+        const marcadas = aberta ? es[i].sel : new Set(r?.respostas?.[i]?.escolhas || [])
+        const botoes = (p.opcoes || []).map(o => {
+          const b = el('button', { class: p.multipla ? 'opt multi' : 'opt', 'aria-pressed': String(marcadas.has(o.rotulo)), disabled: !aberta, onclick: () => {
+            const sel = es[i].sel
+            if (p.multipla) { sel.has(o.rotulo) ? sel.delete(o.rotulo) : sel.add(o.rotulo) } else { const tinha = sel.has(o.rotulo); sel.clear(); if (!tinha) sel.add(o.rotulo) }
+            for (const x of botoes) x.setAttribute('aria-pressed', String(sel.has(x.dataset.rotulo)))
+            mirar(h)
+          } }, o.rotulo, o.descricao ? el('small', {}, o.descricao) : null)
+          b.dataset.rotulo = o.rotulo
+          return b
+        })
+        // Várias perguntas: cada uma tem seu campo. Uma só: o texto vai na caixa de baixo.
+        const txt = aberta && q.perguntas.length > 1 && p.livre !== false
+          ? el('textarea', { placeholder: 'Outra resposta (opcional)', maxlength: '2000', 'aria-label': `Outra resposta para: ${p.texto}`,
+            oninput: e => { es[i].texto = e.target.value; mirar(h) } }, es[i].texto)
+          : null
+        return el('div', { class: 'msg-p' },
+          p.titulo ? el('div', { class: 'q-title' }, p.titulo) : null,
+          el('div', { class: ehStatus ? 'q-text longo' : 'q-text' }, p.texto),
+          aberta && p.multipla ? el('p', { class: 'sub' }, 'Pode marcar mais de uma.') : null,
+          botoes, txt)
+      })
+      const rodape = ehStatus ? null
+        : aberta ? el('p', { class: 'pede' }, 'Esperando sua resposta')
+        : r ? null
+        : s?.estado === 'respondida-no-pc' ? el('p', { class: 'sub' }, `Respondida no PC${s.resumo ? `: ${s.resumo}` : ''}`)
+        : s?.estado === 'cancelada' ? el('p', { class: 'sub' }, 'Encerrada no PC, sem resposta.')
+        : s?.estado === 'respondida' ? el('p', { class: 'sub resp' }, `Respondida em outro aparelho${s.resumo ? `: ${s.resumo}` : ''}`)
+        : el('p', { class: 'sub' }, 'Expirou sem resposta.')
+      const no = el('div', { class: aberta && alvo === h ? 'msg alvo' : 'msg', id: `m-${h.id}` },
+        el('div', { class: 'msg-meta' }, `${q.origem === 'teste' ? 'Teste' : ehStatus ? 'Atualização' : 'Pergunta'} · ${hora(momento(h))}`),
+        ...imagensDe(h), ...partes, rodape)
+      if (aberta) cartoes.set(h.id, no)
+      return no
+    }
+    const suaResposta = h => {
+      const r = h.resposta
+      const s = st.get(h.id)
+      const varias = h.q.perguntas.length > 1
+      const linhas = (r.respostas || []).map((x, i) => {
+        const t = [(x.escolhas || []).join(', '), x.texto].filter(Boolean).join(' — ')
+        return t && varias ? `${h.q.perguntas[i]?.titulo || h.q.perguntas[i]?.texto}: ${t}` : t
+      }).filter(Boolean)
+      return el('div', { class: 'msg eu' },
+        linhas.length ? el('p', { class: 'resp' }, linhas.join('\n')) : null,
+        ...(r.imagens || []).map(img => figura(idb.get(`${h.id}:r:${img.n}`), img.nome)),
+        s?.estado === 'respondida-no-pc' ? el('p', { class: 'sub' }, 'Não usada: já tinha sido respondida no PC.') : entrega(s?.estado === 'respondida', h.respondidaEm || momento(h)))
+    }
+    const seuComplemento = h => el('div', { class: 'msg eu' },
+      el('div', { class: 'msg-meta' }, 'Complemento'),
+      h.complemento.texto ? el('p', { class: 'resp' }, h.complemento.texto) : null,
+      ...(h.complemento.imagens || []).map(img => figura(idb.get(`${h.id}:c:${img.n}`), img.nome)),
+      entrega(!!st.get(h.id)?.complemento, h.complemento.em))
+    const suaMensagem = m => el('div', { class: 'msg eu' },
+      m.texto ? el('p', { class: 'resp' }, m.texto) : null,
+      ...(m.imagens || []).map(img => figura(idb.get(`${m.id}:r:${img.n}`), img.nome)),
+      entrega(st.get(m.id)?.estado === 'entregue', m.em))
+
+    const blocos = []
+    for (const h of cv.itens) {
+      blocos.push({ em: momento(h), no: doClaude(h) })
+      if (h.resposta) blocos.push({ em: h.respondidaEm || momento(h) + 1, no: suaResposta(h) })
+      if (h.complemento) blocos.push({ em: h.complemento.em, no: seuComplemento(h) })
+    }
+    for (const m of cv.enviadas) blocos.push({ em: m.em, no: suaMensagem(m) })
+    blocos.sort((a, b) => a.em - b.em)
+
+    const modo = alvo ? 'resposta' : sessaoAberta ? 'mensagem' : podeComp ? 'complemento' : null
+    caixa = modo ? caixaMensagem({
+      placeholder: textoCaixa(),
+      rotulo: 'Enviar',
+      podeEnviar: () => !!alvo && doItem(alvo).some(e => e.sel.size || e.texto.trim()),
+      aoEnviar: async ({ texto, fotos }) => {
+        const minhaVez = vez
+        if (alvo) {
+          const h = alvo
+          const respostas = doItem(h).map(e => ({ escolhas: [...e.sel], texto: e.texto.trim() }))
+          if (texto) {
+            const ult = respostas[respostas.length - 1]
+            ult.texto = [ult.texto, texto].filter(Boolean).join(' — ')
+          }
+          const imagens = await subirFotos(cfg, k, h.id, fotos, false)
+          await enviarCifrado(cfg, k, h.id, { respostas, imagens: imagens.length ? imagens : undefined })
+          registrar(h.id, { resposta: { respostas, imagens }, respondidaEm: Date.now() })
+          escolhas.delete(h.id)
+        } else if (sessaoAberta) {
+          const id = c.toHex(c.aleatorio(16))
+          const imagens = await subirFotos(cfg, k, id, fotos, false)
+          const corpoMsg = c.selar(k, `m:${cv.sessao}`, { v: 1, tipo: 'mensagem', sessao: cv.sessao, id, texto, imagens: imagens.length ? imagens : undefined, em: Date.now() })
+          const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: corpoMsg })
+          if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
+          salvarEnviada({ id, sessao: cv.sessao, texto, imagens, em: Date.now() })
+        } else {
+          const h = ultimaResp
+          const imagens = await subirFotos(cfg, k, h.id, fotos, true)
+          await enviarCifrado(cfg, k, h.id, { complemento: true, texto, imagens: imagens.length ? imagens : undefined })
+          registrar(h.id, { complemento: { texto, imagens, em: Date.now() } })
+        }
+        if (minhaVez === vez) { vez++; telaConversa(cfg, chave) }
+      },
+    }) : null
+
+    const linhaSub = [cv.pc ? `PC: ${cv.pc}` : null,
+      cv.sessao ? (sessaoAberta ? `recebe mensagens até ${hora(cv.ate)}` : 'não recebe mais mensagens (12 h sem contato)') : null].filter(Boolean).join(' · ')
+    // Como num chat: quem estava no fim continua no fim; quem rolou para cima fica onde estava.
+    const y = window.scrollY
+    const noFim = window.innerHeight + y >= document.documentElement.scrollHeight - 80
+    tela(voltar(),
+      el('div', { class: 'conv-cab' }, el('div', { class: 'conv-tit' }, cv.projeto || 'Claude'), linhaSub ? el('p', { class: 'sub' }, linhaSub) : null),
+      blocos.flatMap((b, i) => rotuloDia(b.em) !== (i ? rotuloDia(blocos[i - 1].em) : '') ? [el('div', { class: 'dia' }, rotuloDia(b.em)), b.no] : [b.no]),
+      !modo ? el('p', { class: 'sub nota' }, cv.sessao ? 'Para escrever de novo, espere a sessão mandar algo.' : 'Nada para responder aqui.') : null,
+      caixa ? caixa.el : null)
+    const focoEl = !focoVisto && document.getElementById(`m-${foco}`)
+    if (focoEl) { focoEl.scrollIntoView({ block: 'start' }); focoVisto = true }
+    else if (primeira || noFim) window.scrollTo(0, document.documentElement.scrollHeight)
+    else window.scrollTo(0, y)
+    primeira = false
   }
-  const caixa = aberta ? caixaMensagem({
-    placeholder: 'Mensagem para esta sessão',
-    rotulo: 'Enviar mensagem',
-    aoEnviar: async ({ texto, fotos }) => {
-      const agoraVez = vez
-      const id = c.toHex(c.aleatorio(16))
-      const imagens = await subirFotos(cfg, k, id, fotos, false)
-      const corpoMsg = c.selar(k, `m:${sid}`, { v: 1, tipo: 'mensagem', sessao: sid, id, texto, imagens: imagens.length ? imagens : undefined, em: Date.now() })
-      const r = await fetch(`${cfg.servidor}/${cfg.topico}-r`, { method: 'POST', body: corpoMsg })
-      if (!r.ok) throw new Error(`ntfy respondeu ${r.status}`)
-      salvarEnviada({ id, sessao: sid, texto, imagens, em: Date.now() })
-      if (agoraVez === vez) telaSessao(cfg, sid, 'Mensagem enviada ✓ A sessão recebe em até ~30 s.')
-    },
-  }) : null
-  tela(voltar(),
-    faixa ? el('div', { class: 'faixa', role: 'status' }, faixa) : null,
-    el('h2', {}, s.projeto || 'Sessão do Claude'),
-    el('p', { class: 'sub' }, [s.pc ? `PC: ${s.pc}` : null, aberta ? `recebe mensagens até ${hora(s.ate)}` : 'não recebe mais mensagens (12 h sem contato)'].filter(Boolean).join(' · ')),
-    el('div', { class: 'lista' }, linhaBox),
-    aberta ? el('p', { class: 'sub' }, 'A mensagem entra na sessão como se você tivesse digitado. Permissões continuam só no PC.') : null,
-    caixa ? caixa.el : null)
-  desenhar(new Map())
-  atualizarInicio = async () => {
+
+  atualizar = async () => {
     if (minha !== vez) return
-    const st = await statusTodos(cfg, k)
+    let st
+    try {
+      await sincronizar(cfg, k)
+      st = await statusTodos(cfg, k)
+    } catch {
+      if (minha === vez && primeira) desenhar(new Map()) // sem rede: mostra o que este celular já tem
+      return
+    }
     if (minha === vez) desenhar(st)
   }
-  await atualizarInicio()
+  if (conversas().some(x => x.chave === chave)) desenhar(new Map())
+  else tela(voltar(), el('p', { class: 'sub' }, 'Buscando…'))
+  await atualizar()
 }
 
 // ---------- uma aba só ----------
@@ -857,8 +899,8 @@ function iniciar() {
   const idSessao = params.get('sessao')
   const cfg = lerConfig()
   if (!cfg || !cfg.mestra || !cfg.topico) telaPareamento(idPergunta ? 'Pareie este celular primeiro para responder.' : undefined)
-  else if (idPergunta) telaPergunta(cfg, idPergunta)
-  else if (idSessao) telaSessao(cfg, idSessao)
+  else if (idPergunta) abrirPorId(cfg, idPergunta)
+  else if (idSessao) telaConversa(cfg, idSessao)
   else telaInicio(false)
 }
 
